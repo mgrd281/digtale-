@@ -1,22 +1,14 @@
 import prisma from "../db.server";
 import { env } from "./env.server";
 import { generateDownloadToken } from "./tokens.server";
+import { numericId, LOW_STOCK_THRESHOLD } from "./shared";
 import {
   sendDeliveryEmail,
   sendMerchantAlert,
   type DeliveryEmailItem,
 } from "./email.server";
 
-export const LOW_STOCK_THRESHOLD = 10;
-
-// Shopify webhook product/variant IDs arrive numeric; Admin GraphQL returns
-// GIDs. We normalise both to the trailing numeric string so the two sources
-// reconcile.
-export function numericId(value: string | number | null | undefined): string {
-  const s = String(value ?? "");
-  const match = s.match(/(\d+)\s*$/);
-  return match ? match[1] : s;
-}
+export { numericId, LOW_STOCK_THRESHOLD };
 
 export interface PaidOrderLineItem {
   productId: string | number | null;

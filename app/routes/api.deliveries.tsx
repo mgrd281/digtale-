@@ -1,7 +1,7 @@
 import type { LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
-import { numericId } from "../lib/fulfillment.server";
+import { numericId } from "../lib/shared";
 import { env } from "../lib/env.server";
 import { de } from "../lib/strings.server";
 

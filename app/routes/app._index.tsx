@@ -3,7 +3,7 @@ import { useLoaderData, Link } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
-import { LOW_STOCK_THRESHOLD } from "../lib/fulfillment.server";
+import { LOW_STOCK_THRESHOLD } from "../lib/shared";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
