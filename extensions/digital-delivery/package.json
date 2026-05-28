@@ -1,0 +1,15 @@
+{
+  "name": "karinex-digital-delivery",
+  "private": true,
+  "version": "1.0.0",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "react": "^18.3.1",
+    "@shopify/ui-extensions": "^2025.7.0",
+    "@shopify/ui-extensions-react": "^2025.7.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.25",
+    "typescript": "^5.9.3"
+  }
+}

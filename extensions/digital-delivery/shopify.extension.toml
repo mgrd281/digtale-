@@ -1,0 +1,21 @@
+api_version = "2025-07"
+
+[[extensions]]
+name = "KARINEX Digitale Auslieferung"
+handle = "karinex-digital-delivery"
+type = "ui_extension"
+
+  # Allow the extension to call the app backend (/api/deliveries).
+  [extensions.capabilities]
+  api_access = true
+  network_access = true
+
+  # Thank-you page block (immediately after payment).
+  [[extensions.targeting]]
+  target = "purchase.thank-you.block.render"
+  module = "./src/ThankYou.tsx"
+
+  # Order-status page block (customer account, later access).
+  [[extensions.targeting]]
+  target = "customer-account.order-status.block.render"
+  module = "./src/OrderStatus.tsx"
