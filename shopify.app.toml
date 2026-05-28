@@ -1,9 +1,23 @@
 # This file stores configurations for your Shopify app.
-client_id = ""
+client_id = "1d26b3b50a07a39599a71b977bc6e467"
+name = "karinex"
+handle = "karinex"
+application_url = "https://app-production-51af.up.railway.app"
+embedded = true
+
+[build]
+automatically_update_urls_on_dev = true
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
 scopes = "read_orders,read_products"
+
+[auth]
+redirect_urls = [
+  "https://app-production-51af.up.railway.app/auth/callback",
+  "https://app-production-51af.up.railway.app/auth/shopify/callback",
+  "https://app-production-51af.up.railway.app/api/auth/callback"
+]
 
 [webhooks]
 api_version = "2025-10"
@@ -21,27 +35,8 @@ api_version = "2025-10"
 
   # Handled by: /app/routes/webhooks.app.scopes_update.tsx
   [[webhooks.subscriptions]]
-  topics = [ "app/scopes_update" ]
+  topics = ["app/scopes_update"]
   uri = "/webhooks/app/scopes_update"
 
-  # Webhooks can have filters
-  # Only receive webhooks for product updates with a product price >= 10.00
-  # See: https://shopify.dev/docs/apps/build/webhooks/customize/filters
-  # [[webhooks.subscriptions]]
-  # topics = ["products/update"]
-  # uri = "/webhooks/products/update"
-  # filter = "variants.price:>=10.00"
-
-  # Mandatory compliance topic for public apps only
-  # See: https://shopify.dev/docs/apps/build/privacy-law-compliance
-  # [[webhooks.subscriptions]]
-  # uri = "/webhooks/customers/data_request"
-  # compliance_topics = ["customers/data_request"]
-
-  # [[webhooks.subscriptions]]
-  # uri = "/webhooks/customers/redact"
-  # compliance_topics = ["customers/redact"]
-
-  # [[webhooks.subscriptions]]
-  # uri = "/webhooks/shop/redact"
-  # compliance_topics = ["shop/redact"]
+[pos]
+embedded = false
