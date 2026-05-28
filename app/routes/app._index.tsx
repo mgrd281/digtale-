@@ -1,249 +1,109 @@
-import { useEffect } from "react";
-import type {
-  ActionFunctionArgs,
-  HeadersFunction,
-  LoaderFunctionArgs,
-} from "react-router";
-import { useFetcher } from "react-router";
-import { useAppBridge } from "@shopify/app-bridge-react";
-import { authenticate } from "../shopify.server";
+import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
+import { useLoaderData, Link } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
+import { authenticate } from "../shopify.server";
+import prisma from "../db.server";
+import { LOW_STOCK_THRESHOLD } from "../lib/fulfillment.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
 
-  return null;
-};
-
-export const action = async ({ request }: ActionFunctionArgs) => {
-  const { admin } = await authenticate.admin(request);
-  const color = ["Red", "Orange", "Yellow", "Green"][
-    Math.floor(Math.random() * 4)
-  ];
-  const response = await admin.graphql(
-    `#graphql
-      mutation populateProduct($product: ProductCreateInput!) {
-        productCreate(product: $product) {
-          product {
-            id
-            title
-            handle
-            status
-            variants(first: 10) {
-              edges {
-                node {
-                  id
-                  price
-                  barcode
-                  createdAt
-                }
-              }
-            }
-          }
-        }
-      }`,
-    {
-      variables: {
-        product: {
-          title: `${color} Snowboard`,
+  const [products, failedCount, pendingCount, deliveredCount] = await Promise.all([
+    prisma.product.findMany({
+      orderBy: { title: "asc" },
+      include: {
+        _count: {
+          select: { licenseKeys: { where: { status: "AVAILABLE" } } },
         },
       },
-    },
-  );
-  const responseJson = await response.json();
+    }),
+    prisma.delivery.count({ where: { status: "FAILED" } }),
+    prisma.delivery.count({ where: { status: "PENDING" } }),
+    prisma.delivery.count({ where: { status: "DELIVERED" } }),
+  ]);
 
-  const product = responseJson.data!.productCreate!.product!;
-  const variantId = product.variants.edges[0]!.node!.id!;
-
-  const variantResponse = await admin.graphql(
-    `#graphql
-    mutation shopifyReactRouterTemplateUpdateVariant($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
-      productVariantsBulkUpdate(productId: $productId, variants: $variants) {
-        productVariants {
-          id
-          price
-          barcode
-          createdAt
-        }
-      }
-    }`,
-    {
-      variables: {
-        productId: product.id,
-        variants: [{ id: variantId, price: "100.00" }],
-      },
-    },
-  );
-
-  const variantResponseJson = await variantResponse.json();
+  const lowStock = products
+    .filter(
+      (p) =>
+        (p.deliveryType === "KEY" || p.deliveryType === "BOTH") &&
+        p._count.licenseKeys < LOW_STOCK_THRESHOLD,
+    )
+    .map((p) => ({ id: p.id, title: p.title, available: p._count.licenseKeys }));
 
   return {
-    product: responseJson!.data!.productCreate!.product,
-    variant:
-      variantResponseJson!.data!.productVariantsBulkUpdate!.productVariants,
+    productCount: products.length,
+    failedCount,
+    pendingCount,
+    deliveredCount,
+    lowStock,
   };
 };
 
-export default function Index() {
-  const fetcher = useFetcher<typeof action>();
-
-  const shopify = useAppBridge();
-  const isLoading =
-    ["loading", "submitting"].includes(fetcher.state) &&
-    fetcher.formMethod === "POST";
-
-  useEffect(() => {
-    if (fetcher.data?.product?.id) {
-      shopify.toast.show("Product created");
-    }
-  }, [fetcher.data?.product?.id, shopify]);
-
-  const generateProduct = () => fetcher.submit({}, { method: "POST" });
+export default function Dashboard() {
+  const { productCount, failedCount, pendingCount, deliveredCount, lowStock } =
+    useLoaderData<typeof loader>();
 
   return (
-    <s-page heading="Shopify app template">
-      <s-button slot="primary-action" onClick={generateProduct}>
-        Generate a product
-      </s-button>
+    <s-page heading="KARINEX – Digitale Auslieferung">
+      <s-link slot="primary-action" href="/app/products">
+        Produkte verwalten
+      </s-link>
 
-      <s-section heading="Congrats on creating a new Shopify app 🎉">
-        <s-paragraph>
-          This embedded app template uses{" "}
-          <s-link
-            href="https://shopify.dev/docs/apps/tools/app-bridge"
-            target="_blank"
-          >
-            App Bridge
-          </s-link>{" "}
-          interface examples like an{" "}
-          <s-link href="/app/additional">additional page in the app nav</s-link>
-          , as well as an{" "}
-          <s-link
-            href="https://shopify.dev/docs/api/admin-graphql"
-            target="_blank"
-          >
-            Admin GraphQL
-          </s-link>{" "}
-          mutation demo, to provide a starting point for app development.
-        </s-paragraph>
-      </s-section>
-      <s-section heading="Get started with products">
-        <s-paragraph>
-          Generate a product with GraphQL and get the JSON output for that
-          product. Learn more about the{" "}
-          <s-link
-            href="https://shopify.dev/docs/api/admin-graphql/latest/mutations/productCreate"
-            target="_blank"
-          >
-            productCreate
-          </s-link>{" "}
-          mutation in our API references.
-        </s-paragraph>
-        <s-stack direction="inline" gap="base">
-          <s-button
-            onClick={generateProduct}
-            {...(isLoading ? { loading: true } : {})}
-          >
-            Generate a product
-          </s-button>
-          {fetcher.data?.product && (
-            <s-button
-              onClick={() => {
-                shopify.intents.invoke?.("edit:shopify/Product", {
-                  value: fetcher.data?.product?.id,
-                });
-              }}
-              target="_blank"
-              variant="tertiary"
-            >
-              Edit product
-            </s-button>
-          )}
+      {failedCount > 0 && (
+        <s-banner tone="critical" heading="Fehlgeschlagene Lieferungen">
+          <s-paragraph>
+            {failedCount} Lieferung(en) konnten nicht ausgeliefert werden.{" "}
+            <Link to="/app/deliveries?status=FAILED">Jetzt prüfen</Link>.
+          </s-paragraph>
+        </s-banner>
+      )}
+
+      {lowStock.length > 0 && (
+        <s-banner tone="warning" heading="Niedriger Schlüsselbestand">
+          <s-unordered-list>
+            {lowStock.map((p) => (
+              <s-list-item key={p.id}>
+                {p.title}: nur noch {p.available} Schlüssel verfügbar
+              </s-list-item>
+            ))}
+          </s-unordered-list>
+        </s-banner>
+      )}
+
+      <s-section heading="Auf einen Blick">
+        <s-stack direction="inline" gap="large">
+          <s-box padding="base" borderWidth="base" borderRadius="base">
+            <s-text>Produkte</s-text>
+            <s-heading>{String(productCount)}</s-heading>
+          </s-box>
+          <s-box padding="base" borderWidth="base" borderRadius="base">
+            <s-text>Ausgeliefert</s-text>
+            <s-heading>{String(deliveredCount)}</s-heading>
+          </s-box>
+          <s-box padding="base" borderWidth="base" borderRadius="base">
+            <s-text>In Bearbeitung</s-text>
+            <s-heading>{String(pendingCount)}</s-heading>
+          </s-box>
+          <s-box padding="base" borderWidth="base" borderRadius="base">
+            <s-text>Fehlgeschlagen</s-text>
+            <s-heading>{String(failedCount)}</s-heading>
+          </s-box>
         </s-stack>
-        {fetcher.data?.product && (
-          <s-section heading="productCreate mutation">
-            <s-stack direction="block" gap="base">
-              <s-box
-                padding="base"
-                borderWidth="base"
-                borderRadius="base"
-                background="subdued"
-              >
-                <pre style={{ margin: 0 }}>
-                  <code>{JSON.stringify(fetcher.data.product, null, 2)}</code>
-                </pre>
-              </s-box>
-
-              <s-heading>productVariantsBulkUpdate mutation</s-heading>
-              <s-box
-                padding="base"
-                borderWidth="base"
-                borderRadius="base"
-                background="subdued"
-              >
-                <pre style={{ margin: 0 }}>
-                  <code>{JSON.stringify(fetcher.data.variant, null, 2)}</code>
-                </pre>
-              </s-box>
-            </s-stack>
-          </s-section>
-        )}
       </s-section>
 
-      <s-section slot="aside" heading="App template specs">
-        <s-paragraph>
-          <s-text>Framework: </s-text>
-          <s-link href="https://reactrouter.com/" target="_blank">
-            React Router
-          </s-link>
-        </s-paragraph>
-        <s-paragraph>
-          <s-text>Interface: </s-text>
-          <s-link
-            href="https://shopify.dev/docs/api/app-home/using-polaris-components"
-            target="_blank"
-          >
-            Polaris web components
-          </s-link>
-        </s-paragraph>
-        <s-paragraph>
-          <s-text>API: </s-text>
-          <s-link
-            href="https://shopify.dev/docs/api/admin-graphql"
-            target="_blank"
-          >
-            GraphQL
-          </s-link>
-        </s-paragraph>
-        <s-paragraph>
-          <s-text>Database: </s-text>
-          <s-link href="https://www.prisma.io/" target="_blank">
-            Prisma
-          </s-link>
-        </s-paragraph>
-      </s-section>
-
-      <s-section slot="aside" heading="Next steps">
-        <s-unordered-list>
+      <s-section slot="aside" heading="Erste Schritte">
+        <s-ordered-list>
           <s-list-item>
-            Build an{" "}
-            <s-link
-              href="https://shopify.dev/docs/apps/getting-started/build-app-example"
-              target="_blank"
-            >
-              example app
-            </s-link>
+            Unter <s-link href="/app/products">Produkte</s-link> mit Shopify
+            synchronisieren.
           </s-list-item>
           <s-list-item>
-            Explore Shopify&apos;s API with{" "}
-            <s-link
-              href="https://shopify.dev/docs/apps/tools/graphiql-admin-api"
-              target="_blank"
-            >
-              GraphiQL
-            </s-link>
+            Lieferart festlegen sowie Schlüssel und Dateien hochladen.
           </s-list-item>
-        </s-unordered-list>
+          <s-list-item>
+            Nach Zahlungseingang läuft die Auslieferung automatisch.
+          </s-list-item>
+        </s-ordered-list>
       </s-section>
     </s-page>
   );
