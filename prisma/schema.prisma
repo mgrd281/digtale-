@@ -1,18 +1,16 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// KARINEX digital fulfillment – Prisma schema
+// Docs: https://pris.ly/d/prisma-schema
 
 generator client {
   provider = "prisma-client-js"
 }
 
-// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
-// enough when changing adapters.
-// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
 datasource db {
-  provider = "sqlite"
-  url      = "file:dev.sqlite"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
+// --- Shopify session storage (required by the app template) ---
 model Session {
   id            String    @id
   shop          String
@@ -29,6 +27,107 @@ model Session {
   locale        String?
   collaborator  Boolean?  @default(false)
   emailVerified Boolean?  @default(false)
+
   refreshToken        String?
   refreshTokenExpires DateTime?
+}
+
+// --- Domain enums ---
+enum DeliveryType {
+  KEY
+  FILE
+  BOTH
+}
+
+enum KeyStatus {
+  AVAILABLE
+  ASSIGNED
+}
+
+enum DeliveryStatus {
+  PENDING
+  DELIVERED
+  FAILED
+}
+
+// --- App data ---
+model Product {
+  id               String       @id @default(cuid())
+  shopifyProductId String       @unique
+  title            String
+  deliveryType     DeliveryType @default(KEY)
+  downloadLimit    Int          @default(3)
+  linkExpiryHours  Int          @default(72)
+  createdAt        DateTime     @default(now())
+
+  licenseKeys LicenseKey[]
+  files       DigitalFile[]
+  deliveries  Delivery[]
+}
+
+model LicenseKey {
+  id              String    @id @default(cuid())
+  productId       String
+  keyValue        String    @unique
+  status          KeyStatus @default(AVAILABLE)
+  assignedOrderId String?
+  assignedAt      DateTime?
+
+  product  Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  delivery Delivery?
+
+  @@index([productId, status])
+}
+
+model DigitalFile {
+  id         String   @id @default(cuid())
+  productId  String
+  fileName   String
+  storageKey String
+  sizeBytes  BigInt   @default(0)
+  createdAt  DateTime @default(now())
+
+  product Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tokens  DownloadToken[]
+
+  @@index([productId])
+}
+
+model Delivery {
+  id               String         @id @default(cuid())
+  shopifyOrderId   String
+  shopifyOrderName String
+  customerEmail    String
+  productId        String
+  licenseKeyId     String?        @unique
+  status           DeliveryStatus @default(PENDING)
+  errorMessage     String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  product    Product         @relation(fields: [productId], references: [id])
+  licenseKey LicenseKey?     @relation(fields: [licenseKeyId], references: [id])
+  tokens     DownloadToken[]
+
+  // Idempotency: one delivery per order + product.
+  @@unique([shopifyOrderId, productId])
+  @@index([shopifyOrderId])
+  @@index([status])
+}
+
+model DownloadToken {
+  id            String   @id @default(cuid())
+  deliveryId    String
+  fileId        String
+  token         String   @unique
+  expiresAt     DateTime
+  maxDownloads  Int      @default(3)
+  downloadCount Int      @default(0)
+  revoked       Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  delivery Delivery    @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  file     DigitalFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@index([deliveryId])
 }
