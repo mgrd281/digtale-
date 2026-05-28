@@ -91,26 +91,24 @@ async function processProduct(
 ): Promise<ProcessResult | null> {
   const shopifyOrderId = numericId(order.id);
 
-  const existing = await prisma.delivery.findUnique({
+  // Upsert keyed on the (order, product) unique pair so concurrent webhook
+  // deliveries can never create two rows for the same line.
+  const delivery = await prisma.delivery.upsert({
     where: {
       shopifyOrderId_productId: { shopifyOrderId, productId: product.id },
     },
+    update: {},
+    create: {
+      shopifyOrderId,
+      shopifyOrderName: order.name,
+      customerEmail: order.email,
+      productId: product.id,
+      status: "PENDING",
+    },
   });
-  if (existing?.status === "DELIVERED") {
+  if (delivery.status === "DELIVERED") {
     return null; // already fulfilled – idempotent no-op
   }
-
-  const delivery =
-    existing ??
-    (await prisma.delivery.create({
-      data: {
-        shopifyOrderId,
-        shopifyOrderName: order.name,
-        customerEmail: order.email,
-        productId: product.id,
-        status: "PENDING",
-      },
-    }));
 
   const wantsKey = product.deliveryType === "KEY" || product.deliveryType === "BOTH";
   const wantsFile = product.deliveryType === "FILE" || product.deliveryType === "BOTH";
@@ -144,11 +142,25 @@ async function processProduct(
         });
         return { deliveryId: delivery.id, failed: true };
       }
-      licenseKeyValue = claimed.keyValue;
-      await prisma.delivery.update({
-        where: { id: delivery.id },
+      // Attach only if no key is set yet. If a concurrent run won the race,
+      // release the key we just claimed back into the pool so it is not lost.
+      const attached = await prisma.delivery.updateMany({
+        where: { id: delivery.id, licenseKeyId: null },
         data: { licenseKeyId: claimed.id },
       });
+      if (attached.count === 0) {
+        await prisma.licenseKey.update({
+          where: { id: claimed.id },
+          data: { status: "AVAILABLE", assignedOrderId: null, assignedAt: null },
+        });
+        const current = await prisma.delivery.findUnique({
+          where: { id: delivery.id },
+          include: { licenseKey: true },
+        });
+        licenseKeyValue = current?.licenseKey?.keyValue ?? null;
+      } else {
+        licenseKeyValue = claimed.keyValue;
+      }
     }
   }
 
