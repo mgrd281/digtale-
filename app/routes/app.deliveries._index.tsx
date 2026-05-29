@@ -148,6 +148,9 @@ export default function Deliveries() {
                   <s-table-cell>{d.createdAt}</s-table-cell>
                   <s-table-cell>
                     <s-stack direction="inline" gap="small-100">
+                      <s-link href={`/app/deliveries/${d.id}`}>
+                        Kundenansicht
+                      </s-link>
                       <action.Form method="post">
                         <input type="hidden" name="intent" value="resend" />
                         <input type="hidden" name="deliveryId" value={d.id} />

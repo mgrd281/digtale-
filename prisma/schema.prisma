@@ -76,6 +76,9 @@ model Product {
   deliveryType     DeliveryType @default(KEY)
   downloadLimit    Int          @default(3)
   linkExpiryHours  Int          @default(72)
+  // Deliver this product already on order creation (Vorkasse / unpaid),
+  // overriding the global setting for this product.
+  deliverUnpaid    Boolean      @default(false)
   // Optional per-product instructions shown to the customer (and e-mailed)
   // alongside the key/downloads, e.g. installation notes ("Anleitung").
   deliveryMessage  String?

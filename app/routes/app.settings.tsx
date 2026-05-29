@@ -9,30 +9,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { getSettings, updateSettings } from "../lib/settings.server";
 import { sendTestEmail } from "../lib/email.server";
-
-// Register the orders/create webhook via the API so Vorkasse delivery works
-// without a CLI config deploy. Idempotent + best-effort.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function ensureOrdersCreateWebhook(admin: any) {
-  const appUrl = (process.env.SHOPIFY_APP_URL ?? "").replace(/\/$/, "");
-  if (!appUrl) return;
-  try {
-    await admin.graphql(
-      `#graphql
-      mutation RegisterOrdersCreate($url: URL!) {
-        webhookSubscriptionCreate(
-          topic: ORDERS_CREATE
-          webhookSubscription: { callbackUrl: $url, format: JSON }
-        ) {
-          userErrors { message }
-        }
-      }`,
-      { variables: { url: `${appUrl}/webhooks/orders/create` } },
-    );
-  } catch {
-    // A duplicate subscription just means it's already registered.
-  }
-}
+import { ensureOrdersCreateWebhook } from "../lib/webhooks.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin } = await authenticate.admin(request);
