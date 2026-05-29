@@ -53,6 +53,10 @@ function DeliveryBlock() {
     );
   }
 
+  if (data.hide) {
+    return null;
+  }
+
   if (data.pending || data.items.length === 0) {
     return (
       <Banner status="info" title={data.heading}>

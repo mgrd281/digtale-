@@ -14,6 +14,7 @@ export interface DeliveryItem {
 }
 
 export interface DeliveriesResponse {
+  hide?: boolean;
   pending: boolean;
   heading: string;
   keyLabel: string;
