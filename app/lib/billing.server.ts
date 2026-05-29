@@ -20,12 +20,16 @@ export interface Plan {
   currency: string;
   trialDays: number;
   popular?: boolean;
+  // Differentiators shown on the Abo cards. products = 0 means unlimited.
+  // support: "std" | "mail" | "prio".
+  products: number;
+  support: "std" | "mail" | "prio";
 }
 
 export const PLANS: Plan[] = [
-  { id: "Starter", price: 9.99, currency: "USD", trialDays: 14 },
-  { id: "Pro", price: 19.99, currency: "USD", trialDays: 14, popular: true },
-  { id: "Business", price: 39.99, currency: "USD", trialDays: 14 },
+  { id: "Starter", price: 9.99, currency: "USD", trialDays: 3, products: 50, support: "std" },
+  { id: "Pro", price: 19.99, currency: "USD", trialDays: 3, popular: true, products: 500, support: "mail" },
+  { id: "Business", price: 39.99, currency: "USD", trialDays: 3, products: 0, support: "prio" },
 ];
 
 export const PLAN_IDS = PLANS.map((p) => p.id);

@@ -106,7 +106,7 @@ export default function Landing() {
               <button className="lp-btn" type="submit">Kostenlos starten</button>
             </Form>
           )}
-          <div className="lp-hint">14 Tage kostenlos testen · keine Kreditkarte für die Installation</div>
+          <div className="lp-hint">3 Tage kostenlos testen · keine Kreditkarte für die Installation</div>
           <div className="lp-trust">
             <span>✓ In Minuten startklar</span>
             <span>✓ DSGVO-konform</span>
@@ -156,7 +156,7 @@ export default function Landing() {
             <div className="lp-price">
               <div className="amt">9,99 $<span> / Monat</span></div>
               <ul>
-                <li><b>✓</b> 14 Tage kostenlos testen</li>
+                <li><b>✓</b> 3 Tage kostenlos testen</li>
                 <li><b>✓</b> Unbegrenzte Produkte &amp; Bestellungen</li>
                 <li><b>✓</b> Schlüssel, Dateien &amp; Download-Links</li>
                 <li><b>✓</b> 10 Sprachen inkl. Arabisch (RTL)</li>
