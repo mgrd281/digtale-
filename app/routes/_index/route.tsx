@@ -184,7 +184,11 @@ export default function Landing() {
       <footer className="lp-foot">
         <div className="lp-wrap row">
           <div className="lp-logo" style={{ color: "#fff" }}>KARINEX</div>
-          <div>© {new Date().getFullYear()} KARINEX · Digitale Auslieferung für Shopify</div>
+          <div style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center" }}>
+            <a href="/privacy" style={{ color: "#9fc6b7" }}>Datenschutz</a>
+            <a href="/terms" style={{ color: "#9fc6b7" }}>Nutzungsbedingungen</a>
+            <span>© {new Date().getFullYear()} KARINEX</span>
+          </div>
         </div>
       </footer>
     </div>
