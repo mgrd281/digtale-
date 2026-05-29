@@ -26,7 +26,26 @@ export const loader = async ({ params }: LoaderFunctionArgs) => {
       })
     : null;
 
-  const settings = await getSettings();
+  // No delivery → generic invalid-link page (no shop branding available).
+  if (!delivery) {
+    return new Response(
+      `<!doctype html><html lang="de"><head><meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>Link ungültig</title></head>
+      <body style="margin:0;background:#f4f6f8;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1a1a1a;">
+        <div style="max-width:560px;margin:0 auto;padding:32px 18px;">
+          <div style="background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:28px;text-align:center;">
+            <h1 style="font-size:18px;margin:0 0 8px;">Link ungültig</h1>
+            <p style="color:#666;margin:0;">Diese Lieferung wurde nicht gefunden.</p>
+          </div>
+        </div>
+      </body></html>`,
+      { status: 404, headers: { "content-type": "text/html; charset=utf-8" } },
+    );
+  }
+
+  // Branding comes from the shop that owns this delivery.
+  const settings = await getSettings(delivery.shop);
   const t = getStrings(settings.defaultLocale);
   const brand = settings.brandColor || "#0b3d2e";
 
@@ -40,16 +59,6 @@ export const loader = async ({ params }: LoaderFunctionArgs) => {
       </body></html>`,
       { status, headers: { "content-type": "text/html; charset=utf-8" } },
     );
-
-  if (!delivery) {
-    return page(
-      `<div style="background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:28px;text-align:center;">
-        <h1 style="font-size:18px;margin:0 0 8px;">Link ungültig</h1>
-        <p style="color:#666;margin:0;">Diese Lieferung wurde nicht gefunden.</p>
-      </div>`,
-      404,
-    );
-  }
 
   const header = settings.logoUrl
     ? `<img src="${esc(settings.logoUrl)}" alt="${esc(settings.shopName)}" style="max-height:44px;margin-bottom:22px;" />`

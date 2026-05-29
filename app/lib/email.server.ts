@@ -123,13 +123,14 @@ function renderText(
 }
 
 export async function sendDeliveryEmail(params: {
+  shop: string;
   to: string;
   orderName: string;
   items: DeliveryEmailItem[];
   locale?: string | null;
 }): Promise<void> {
-  const { to, orderName, items, locale } = params;
-  const settings = await getSettings();
+  const { shop, to, orderName, items, locale } = params;
+  const settings = await getSettings(shop);
   const t = getStrings(locale ?? settings.defaultLocale);
   await getTransporter().sendMail({
     from: env.smtp.from,
@@ -143,11 +144,12 @@ export async function sendDeliveryEmail(params: {
 // Send a sample delivery e-mail so the merchant can verify the SMTP setup and
 // preview the branded template without a real order.
 export async function sendTestEmail(params: {
+  shop: string;
   to: string;
   locale?: string | null;
 }): Promise<void> {
-  const { to, locale } = params;
-  const settings = await getSettings();
+  const { shop, to, locale } = params;
+  const settings = await getSettings(shop);
   const t = getStrings(locale ?? settings.defaultLocale);
   const sample: DeliveryEmailItem = {
     productTitle: "KARINEX Test-Produkt",

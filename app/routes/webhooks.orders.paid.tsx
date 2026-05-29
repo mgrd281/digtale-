@@ -38,7 +38,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   };
 
   try {
-    await fulfillPaidOrder(paid);
+    await fulfillPaidOrder(shop, paid);
   } catch (error) {
     // Failures are recorded as FAILED deliveries and the merchant is alerted
     // inside fulfillPaidOrder. We swallow here and return 200 so Shopify does

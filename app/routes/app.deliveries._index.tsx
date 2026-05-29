@@ -15,14 +15,14 @@ import type { DeliveryStatus, Prisma } from "@prisma/client";
 const STATUSES: DeliveryStatus[] = ["PENDING", "DELIVERED", "FAILED"];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  await authenticate.admin(request);
-  const settings = await getSettings();
+  const { session } = await authenticate.admin(request);
+  const settings = await getSettings(session.shop);
 
   const url = new URL(request.url);
   const q = url.searchParams.get("q")?.trim() ?? "";
   const status = url.searchParams.get("status") ?? "";
 
-  const where: Prisma.DeliveryWhereInput = {};
+  const where: Prisma.DeliveryWhereInput = { shop: session.shop };
   if (status && STATUSES.includes(status as DeliveryStatus)) {
     where.status = status as DeliveryStatus;
   }
@@ -63,25 +63,26 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  await authenticate.admin(request);
-  const { adminLocale: locale } = await getSettings();
+  const { session } = await authenticate.admin(request);
+  const shop = session.shop;
+  const { adminLocale: locale } = await getSettings(shop);
   const formData = await request.formData();
   const intent = String(formData.get("intent"));
   const deliveryId = String(formData.get("deliveryId"));
 
   try {
     if (intent === "resend") {
-      await resendDelivery(deliveryId);
+      await resendDelivery(shop, deliveryId);
       return { ok: true, message: t(locale, "deliveries.msgResent") };
     }
     if (intent === "revoke") {
-      await revokeDelivery(deliveryId);
+      await revokeDelivery(shop, deliveryId);
       return { ok: true, message: t(locale, "deliveries.msgRevoked") };
     }
     if (intent === "delete") {
       // Remove the record (download tokens cascade). The assigned key stays
-      // burned so it is never reissued.
-      await prisma.delivery.delete({ where: { id: deliveryId } });
+      // burned so it is never reissued. Scoped by shop for isolation.
+      await prisma.delivery.deleteMany({ where: { id: deliveryId, shop } });
       return { ok: true, message: t(locale, "deliveries.msgDeleted") };
     }
   } catch (error) {

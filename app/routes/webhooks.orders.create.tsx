@@ -40,7 +40,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   try {
     // unpaidMode: only products opted into Vorkasse (globally or per product)
     // are delivered here.
-    await fulfillPaidOrder(paid, { unpaidMode: true });
+    await fulfillPaidOrder(shop, paid, { unpaidMode: true });
   } catch (error) {
     console.error(`[${topic}] ${shop} fulfillment error for ${order.name}:`, error);
   }

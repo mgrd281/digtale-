@@ -26,11 +26,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     );
   }
 
-  // sessionToken.dest identifies the shop the request originated from.
-  void sessionToken;
+  // sessionToken.dest identifies the shop the request originated from
+  // (e.g. "https://my-store.myshopify.com"); scope the lookup to that shop.
+  const shop = (() => {
+    try {
+      return new URL(sessionToken.dest).hostname;
+    } catch {
+      return sessionToken.dest.replace(/^https?:\/\//, "");
+    }
+  })();
 
   const deliveries = await prisma.delivery.findMany({
-    where: { shopifyOrderId: orderId },
+    where: { shop, shopifyOrderId: orderId },
     include: {
       product: {
         select: {

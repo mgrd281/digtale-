@@ -9,11 +9,11 @@ import { getSettings } from "../lib/settings.server";
 import { t, statusLabel } from "../lib/i18n";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  await authenticate.admin(request);
-  const settings = await getSettings();
+  const { session } = await authenticate.admin(request);
+  const settings = await getSettings(session.shop);
 
-  let delivery = await prisma.delivery.findUnique({
-    where: { id: params.id },
+  let delivery = await prisma.delivery.findFirst({
+    where: { id: params.id, shop: session.shop },
     include: {
       product: { include: { links: { orderBy: { createdAt: "asc" } } } },
       licenseKey: true,

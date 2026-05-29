@@ -13,8 +13,8 @@ import { ensureOrdersCreateWebhook } from "../lib/webhooks.server";
 import { LOCALES, t } from "../lib/i18n";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { admin } = await authenticate.admin(request);
-  const s = await getSettings();
+  const { admin, session } = await authenticate.admin(request);
+  const s = await getSettings(session.shop);
   if (s.deliverUnpaidOrders) {
     await ensureOrdersCreateWebhook(admin);
   }
@@ -34,8 +34,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { admin } = await authenticate.admin(request);
-  const { adminLocale: locale } = await getSettings();
+  const { admin, session } = await authenticate.admin(request);
+  const shop = session.shop;
+  const { adminLocale: locale } = await getSettings(shop);
   const form = await request.formData();
   const intent = String(form.get("intent"));
 
@@ -48,7 +49,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       });
     }
     const deliverUnpaidOrders = form.get("deliverUnpaidOrders") === "true";
-    await updateSettings({
+    await updateSettings(shop, {
       shopName: String(form.get("shopName") ?? "").trim() || "KARINEX",
       brandColor,
       logoUrl: String(form.get("logoUrl") ?? "").trim() || null,
@@ -77,7 +78,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       return data({ ok: false, message: t(locale, "settings.msgInvalidEmail") });
     }
     try {
-      await sendTestEmail({ to, locale: emailLocale });
+      await sendTestEmail({ shop, to, locale: emailLocale });
       return data({
         ok: true,
         message: `${t(locale, "settings.testTo")} ${to} ${t(locale, "settings.msgTestSent")}`,

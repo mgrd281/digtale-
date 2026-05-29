@@ -8,9 +8,12 @@ function downloadUrl(token: string): string {
 
 // Re-send the delivery email for an existing delivery, reusing the already
 // assigned key and the existing (non-revoked) download tokens.
-export async function resendDelivery(deliveryId: string): Promise<void> {
-  const delivery = await prisma.delivery.findUniqueOrThrow({
-    where: { id: deliveryId },
+export async function resendDelivery(
+  shop: string,
+  deliveryId: string,
+): Promise<void> {
+  const delivery = await prisma.delivery.findFirstOrThrow({
+    where: { id: deliveryId, shop },
     include: {
       product: { include: { links: { orderBy: { createdAt: "asc" } } } },
       licenseKey: true,
@@ -37,20 +40,30 @@ export async function resendDelivery(deliveryId: string): Promise<void> {
   };
 
   await sendDeliveryEmail({
+    shop,
     to: delivery.customerEmail,
     orderName: delivery.shopifyOrderName,
     items: [item],
   });
 
   await prisma.delivery.update({
-    where: { id: deliveryId },
+    where: { id: delivery.id },
     data: { status: "DELIVERED", errorMessage: null },
   });
 }
 
 // Revoke a delivery: expire all its download tokens and burn the assigned key
 // (kept ASSIGNED so it is never reissued). The delivery is marked FAILED.
-export async function revokeDelivery(deliveryId: string): Promise<void> {
+export async function revokeDelivery(
+  shop: string,
+  deliveryId: string,
+): Promise<void> {
+  // Guard by shop: ignore the request if the delivery belongs to another shop.
+  const delivery = await prisma.delivery.findFirst({
+    where: { id: deliveryId, shop },
+    select: { id: true },
+  });
+  if (!delivery) return;
   await prisma.$transaction([
     prisma.downloadToken.updateMany({
       where: { deliveryId },

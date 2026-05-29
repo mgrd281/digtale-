@@ -74,6 +74,7 @@ interface ProcessResult {
 // Process a single (order, product) pair. Idempotent: a previously DELIVERED
 // delivery for the same order+product is skipped entirely.
 async function processProduct(
+  shop: string,
   order: PaidOrder,
   product: {
     id: string;
@@ -91,10 +92,15 @@ async function processProduct(
   // deliveries can never create two rows for the same line.
   const delivery = await prisma.delivery.upsert({
     where: {
-      shopifyOrderId_productId: { shopifyOrderId, productId: product.id },
+      shop_shopifyOrderId_productId: {
+        shop,
+        shopifyOrderId,
+        productId: product.id,
+      },
     },
     update: {},
     create: {
+      shop,
       shopifyOrderId,
       shopifyOrderName: order.name,
       customerEmail: order.email,
@@ -221,6 +227,7 @@ async function processProduct(
 // webhook handlers. In unpaidMode only products opted into Vorkasse delivery
 // (globally or per product) are delivered.
 export async function fulfillPaidOrder(
+  shop: string,
   order: PaidOrder,
   opts: { unpaidMode?: boolean } = {},
 ): Promise<void> {
@@ -232,7 +239,7 @@ export async function fulfillPaidOrder(
   }
 
   let products = await prisma.product.findMany({
-    where: { shopifyProductId: { in: wantedIds } },
+    where: { shop, shopifyProductId: { in: wantedIds } },
     include: { links: { orderBy: { createdAt: "asc" } } },
   });
   if (products.length === 0) {
@@ -240,7 +247,7 @@ export async function fulfillPaidOrder(
   }
 
   if (opts.unpaidMode) {
-    const settings = await getSettings();
+    const settings = await getSettings(shop);
     products = products.filter(
       (p) => settings.deliverUnpaidOrders || p.deliverUnpaid,
     );
@@ -253,7 +260,7 @@ export async function fulfillPaidOrder(
   const deliveredIds: string[] = [];
 
   for (const product of products) {
-    const result = await processProduct(order, {
+    const result = await processProduct(shop, order, {
       id: product.id,
       title: product.title,
       deliveryType: product.deliveryType,
@@ -289,6 +296,7 @@ export async function fulfillPaidOrder(
   // must not roll back the delivery: the customer already has on-page access.
   try {
     await sendDeliveryEmail({
+      shop,
       to: order.email,
       orderName: order.name,
       items: emailItems,
