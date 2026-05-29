@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { useEffect, useRef } from "react";
 import type {
   ActionFunctionArgs,
   HeadersFunction,
@@ -102,19 +103,36 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   }
 
   if (intent === "addLink") {
-    const label = String(formData.get("label") ?? "").trim();
-    const url = String(formData.get("url") ?? "").trim();
-    if (!label || !url) {
-      return data({ ok: false, message: "Bitte Bezeichnung und URL angeben." });
+    // Accept many links at once: one per line, "Bezeichnung | https://..."
+    // (the label is optional and defaults to "Download").
+    const raw = String(formData.get("links") ?? "");
+    const toCreate: { label: string; url: string }[] = [];
+    const invalid: string[] = [];
+    for (const line of raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)) {
+      const sep = line.indexOf("|");
+      const label = sep >= 0 ? line.slice(0, sep).trim() : "Download";
+      const url = (sep >= 0 ? line.slice(sep + 1) : line).trim();
+      if (/^https?:\/\//i.test(url)) {
+        toCreate.push({ label: label || "Download", url });
+      } else {
+        invalid.push(line);
+      }
     }
-    if (!/^https?:\/\//i.test(url)) {
+    if (toCreate.length === 0) {
       return data({
         ok: false,
-        message: "Die URL muss mit http:// oder https:// beginnen.",
+        message:
+          "Keine gültige URL gefunden. Format: Bezeichnung | https://… (eine pro Zeile).",
       });
     }
-    await prisma.productLink.create({ data: { productId, label, url } });
-    return data({ ok: true, message: `Download-Link „${label}“ hinzugefügt.` });
+    await prisma.productLink.createMany({
+      data: toCreate.map((l) => ({ productId, label: l.label, url: l.url })),
+    });
+    const note = invalid.length ? ` ${invalid.length} Zeile(n) ohne gültige URL übersprungen.` : "";
+    return data({
+      ok: true,
+      message: `${toCreate.length} Download-Link(s) hinzugefügt.${note}`,
+    });
   }
 
   if (intent === "deleteLink") {
@@ -184,6 +202,27 @@ export default function ProductDetail() {
   const upload = useFetcher<typeof action>();
   const linkFetcher = useFetcher<typeof action>();
 
+  // Auto-save the delivery settings (incl. the customer message) a moment after
+  // any change, so the merchant never has to click "Speichern".
+  const settingsFormRef = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    const form = settingsFormRef.current;
+    if (!form) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const onChange = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => settings.submit(form), 700);
+    };
+    form.addEventListener("change", onChange);
+    form.addEventListener("input", onChange);
+    return () => {
+      form.removeEventListener("change", onChange);
+      form.removeEventListener("input", onChange);
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const low =
     (product.deliveryType === "KEY" || product.deliveryType === "BOTH") &&
     available < LOW_STOCK_THRESHOLD;
@@ -224,7 +263,7 @@ export default function ProductDetail() {
             <s-paragraph>{settings.data.message}</s-paragraph>
           </s-banner>
         )}
-        <settings.Form method="post">
+        <settings.Form method="post" ref={settingsFormRef}>
           <input type="hidden" name="intent" value="settings" />
           <s-stack direction="block" gap="base">
             <s-select
@@ -255,9 +294,16 @@ export default function ProductDetail() {
               value={product.deliveryMessage}
               placeholder="z. B. Installationsanleitung oder Hinweise zur Aktivierung."
             />
-            <s-button type="submit" variant="primary">
-              Speichern
-            </s-button>
+            <s-stack direction="inline" gap="small">
+              <s-button type="submit" variant="primary">
+                Speichern
+              </s-button>
+              <s-text color="subdued">
+                {settings.state !== "idle"
+                  ? "Wird gespeichert …"
+                  : "Änderungen werden automatisch gespeichert"}
+              </s-text>
+            </s-stack>
           </s-stack>
         </settings.Form>
       </s-section>
@@ -276,18 +322,16 @@ export default function ProductDetail() {
         <linkFetcher.Form method="post">
           <input type="hidden" name="intent" value="addLink" />
           <s-stack direction="block" gap="base">
-            <s-text-field
-              label="Bezeichnung"
-              name="label"
-              placeholder="Download + Anleitung"
-            />
-            <s-text-field
-              label="URL"
-              name="url"
-              placeholder="https://…"
+            <s-text-area
+              label="Mehrere Links möglich – ein Link pro Zeile: Bezeichnung | https://…"
+              name="links"
+              rows={5}
+              placeholder={
+                "Download + Anleitung | https://example.com/setup.exe\nHandbuch (PDF) | https://example.com/handbuch.pdf"
+              }
             />
             <s-button type="submit" variant="primary">
-              Link hinzufügen
+              Links hinzufügen
             </s-button>
           </s-stack>
         </linkFetcher.Form>
