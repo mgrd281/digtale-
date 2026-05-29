@@ -289,7 +289,7 @@ export default function Products() {
         </s-banner>
       )}
 
-      <s-section heading="Katalog">
+      <s-section heading={t(locale, "products.catalog")}>
         <style>{CATALOG_CSS}</style>
 
         {rows.length === 0 ? (
