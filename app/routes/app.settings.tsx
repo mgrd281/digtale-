@@ -3,6 +3,7 @@ import type {
   HeadersFunction,
   LoaderFunctionArgs,
 } from "react-router";
+import { useEffect, useRef } from "react";
 import { useLoaderData, useFetcher, data } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
@@ -78,6 +79,26 @@ export default function Settings() {
   const save = useFetcher<typeof action>();
   const test = useFetcher<typeof action>();
 
+  // Auto-save branding/template changes shortly after any edit.
+  const saveFormRef = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    const form = saveFormRef.current;
+    if (!form) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const onChange = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => save.submit(form), 700);
+    };
+    form.addEventListener("change", onChange);
+    form.addEventListener("input", onChange);
+    return () => {
+      form.removeEventListener("change", onChange);
+      form.removeEventListener("input", onChange);
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <s-page heading="Einstellungen">
       <s-section heading="Branding & E-Mail-Vorlage">
@@ -86,7 +107,7 @@ export default function Settings() {
             <s-paragraph>{save.data.message}</s-paragraph>
           </s-banner>
         )}
-        <save.Form method="post">
+        <save.Form method="post" ref={saveFormRef}>
           <input type="hidden" name="intent" value="settings" />
           <s-stack direction="block" gap="base">
             <s-text-field
