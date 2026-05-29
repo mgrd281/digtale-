@@ -3,7 +3,7 @@ import type {
   HeadersFunction,
   LoaderFunctionArgs,
 } from "react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLoaderData, useFetcher, Link } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
@@ -146,20 +146,7 @@ type Row = {
 };
 
 const CATALOG_CSS = `
-  .kx-toolbar { margin: 6px 0 10px; }
-  .kx-searchwrap { position: relative; max-width: 440px; }
-  .kx-searchwrap .kx-ico {
-    position: absolute; left: 15px; top: 50%; transform: translateY(-50%);
-    width: 18px; height: 18px; color: #94a3b8; pointer-events: none;
-  }
-  .kx-search {
-    width: 100%; box-sizing: border-box; padding: 12px 16px 12px 44px;
-    border: 1px solid #e2e8f0; border-radius: 12px; font-size: 14px; outline: none;
-    background: #fff; box-shadow: 0 1px 2px rgba(16,24,40,.04);
-    transition: border-color .15s ease, box-shadow .15s ease;
-  }
-  .kx-search::placeholder { color: #9aa3af; }
-  .kx-search:focus { border-color: #1f48ff; box-shadow: 0 0 0 3px rgba(31,72,255,.12); }
+  .kx-toolbar { margin: 6px 0 12px; max-width: 440px; }
   .kx-sec-head { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 750; color: #111827; margin: 24px 0 4px; }
   .kx-sec-count { font-size: 12px; font-weight: 700; color: #475569; background: #eef2f7; padding: 2px 9px; border-radius: 999px; }
   .kx-cat-head { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13.5px; color: #334155; margin: 16px 0 10px; }
@@ -167,9 +154,7 @@ const CATALOG_CSS = `
   .kx-card {
     display: flex; flex-direction: column; background: #fff; border: 1px solid #e5e7eb;
     border-radius: 16px; padding: 16px; text-decoration: none; color: inherit;
-    box-shadow: 0 1px 2px rgba(16,24,40,.05); transition: box-shadow .15s ease, transform .15s ease;
   }
-  .kx-card:hover { box-shadow: 0 10px 26px rgba(16,24,40,.10); transform: translateY(-2px); }
   .kx-card-top { display: flex; gap: 12px; align-items: flex-start; }
   .kx-card-img {
     width: 52px; height: 52px; flex: 0 0 auto; border-radius: 10px; background: #f6f8fb;
@@ -247,6 +232,22 @@ export default function Products() {
   const syncing = fetcher.state !== "idle";
   const [q, setQ] = useState("");
 
+  // Native Polaris search field; read its value via DOM events for instant
+  // client-side filtering.
+  const searchRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const el = searchRef.current;
+    if (!el) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const onInput = (e: any) => setQ(String(e?.target?.value ?? ""));
+    el.addEventListener("input", onInput);
+    el.addEventListener("change", onInput);
+    return () => {
+      el.removeEventListener("input", onInput);
+      el.removeEventListener("change", onInput);
+    };
+  }, []);
+
   const { activeGroups, inactiveGroups, activeCount, inactiveCount } =
     useMemo(() => {
       const term = q.trim().toLowerCase();
@@ -298,28 +299,11 @@ export default function Products() {
         ) : (
           <>
             <div className="kx-toolbar">
-              <div className="kx-searchwrap">
-                <svg
-                  className="kx-ico"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <circle cx="11" cy="11" r="7" />
-                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
-                <input
-                  className="kx-search"
-                  type="search"
-                  placeholder="Produkt suchen …"
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                />
-              </div>
+              <s-search-field
+                ref={searchRef}
+                label="Suche"
+                placeholder="Produkt suchen …"
+              />
             </div>
 
             <div className="kx-sec-head">
