@@ -3,7 +3,7 @@ import type {
   HeadersFunction,
   LoaderFunctionArgs,
 } from "react-router";
-import { useLoaderData, useFetcher } from "react-router";
+import { useLoaderData, useFetcher, Link } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
@@ -180,7 +180,7 @@ function ProductCard({ r }: { r: Row }) {
   if (r.files > 0) meta.push(`${r.files} Dateien`);
 
   return (
-    <a className="kx-card" href={`/app/products/${r.id}`}>
+    <Link className="kx-card" to={`/app/products/${r.id}`}>
       <div className="kx-thumb">
         {r.imageUrl ? (
           <img src={r.imageUrl} alt={r.title} loading="lazy" />
@@ -212,7 +212,7 @@ function ProductCard({ r }: { r: Row }) {
         </div>
         {meta.length > 0 && <div className="kx-meta">{meta.join(" · ")}</div>}
       </div>
-    </a>
+    </Link>
   );
 }
 

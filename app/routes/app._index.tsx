@@ -100,14 +100,13 @@ export default function Dashboard() {
       )}
 
       {lowStock.length > 0 && (
-        <s-banner tone="warning" heading="Niedriger Schlüsselbestand">
-          <s-unordered-list>
-            {lowStock.map((p) => (
-              <s-list-item key={p.id}>
-                {p.title}: nur noch {p.available} Schlüssel verfügbar
-              </s-list-item>
-            ))}
-          </s-unordered-list>
+        <s-banner tone="warning" heading={`Niedriger Schlüsselbestand (${lowStock.length})`}>
+          <s-paragraph>
+            {lowStock.length} Produkt(e) benötigen Schlüssel, z. B.{" "}
+            {lowStock.slice(0, 3).map((p) => p.title).join(", ")}
+            {lowStock.length > 3 ? ` und ${lowStock.length - 3} weitere` : ""}.{" "}
+            <s-link href="/app/products">Produkte verwalten</s-link>.
+          </s-paragraph>
         </s-banner>
       )}
 
