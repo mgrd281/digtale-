@@ -23,7 +23,7 @@ export default function App() {
           Übersicht
         </a>
         <a href="/app/products">Produkte</a>
-        <a href="/app/deliveries">Lieferungen</a>
+        <a href="/app/deliveries">Order</a>
         <a href="/app/settings">Einstellungen</a>
       </NavMenu>
       <Outlet />
