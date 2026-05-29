@@ -3,7 +3,7 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { numericId } from "../lib/shared";
 import { env } from "../lib/env.server";
-import { de } from "../lib/strings.server";
+import { getStrings } from "../lib/strings.server";
 
 // Read-only endpoint consumed by the Thank-you and Order-status UI extensions.
 // The request is authenticated via the extension's signed session token
@@ -12,6 +12,7 @@ import { de } from "../lib/strings.server";
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
   const surface = url.searchParams.get("surface") ?? "checkout";
+  const t = getStrings(url.searchParams.get("locale"));
 
   const { sessionToken, cors } =
     surface === "order-status"
@@ -21,7 +22,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const orderId = numericId(url.searchParams.get("orderId"));
   if (!orderId) {
     return cors(
-      Response.json({ pending: true, heading: de.heading, items: [] }),
+      Response.json({ pending: true, heading: t.heading, items: [] }),
     );
   }
 
@@ -55,10 +56,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       ? d.product.links.map((l) => ({ fileName: l.label, url: l.url }))
       : [];
     const fileDownloads = d.tokens
-      .filter((t) => t.expiresAt.getTime() > now && t.downloadCount < t.maxDownloads)
-      .map((t) => ({
-        fileName: t.file.fileName,
-        url: `${env.appUrl}/download/${t.token}`,
+      .filter((tok) => tok.expiresAt.getTime() > now && tok.downloadCount < tok.maxDownloads)
+      .map((tok) => ({
+        fileName: tok.file.fileName,
+        url: `${env.appUrl}/download/${tok.token}`,
       }));
     return {
       productTitle: d.product.title,
@@ -77,11 +78,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return cors(
     Response.json({
       pending,
-      heading: de.heading,
-      keyLabel: de.keyLabel,
-      downloadButton: de.downloadButton,
-      pendingMessage: de.pending,
-      legal: de.legal,
+      heading: t.heading,
+      keyLabel: t.keyLabel,
+      downloadButton: t.downloadButton,
+      pendingMessage: t.pending,
+      legal: t.legal,
       items,
     }),
   );

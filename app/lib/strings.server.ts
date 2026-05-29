@@ -1,7 +1,20 @@
-// Customer-facing German strings (Sie-Form, premium tone).
-// Used verbatim per the KARINEX brand spec. Do not translate.
+// Customer-facing strings. German (Sie-Form, premium tone) is the default and
+// must not be reworded; English is offered for non-German buyers.
 
-export const de = {
+export interface Strings {
+  emailSubject: (orderName: string) => string;
+  emailGreeting: string;
+  emailIntro: string;
+  keyLabel: string;
+  downloadButton: string;
+  validityNote: (linkExpiryHours: number, downloadLimit: number) => string;
+  footer: string;
+  heading: string;
+  pending: string;
+  legal: string;
+}
+
+export const de: Strings = {
   emailSubject: (orderName: string) =>
     `Ihre KARINEX-Bestellung ${orderName}: Lizenzschlüssel & Download`,
   emailGreeting: "Sehr geehrte Kundin, sehr geehrter Kunde,",
@@ -18,4 +31,27 @@ export const de = {
   // § 356 Abs. 5 BGB – start of contract performance / waiver of withdrawal.
   legal:
     "Mit dem Download beginnt die Ausführung des Vertrags. Ihr Widerrufsrecht erlischt gemäß § 356 Abs. 5 BGB.",
-} as const;
+};
+
+export const en: Strings = {
+  emailSubject: (orderName: string) =>
+    `Your KARINEX order ${orderName}: licence key & download`,
+  emailGreeting: "Dear customer,",
+  emailIntro:
+    "thank you for your purchase at KARINEX. Below you will find your licence key and the download link for your product.",
+  keyLabel: "Your licence key:",
+  downloadButton: "Download + guide",
+  validityNote: (linkExpiryHours: number, downloadLimit: number) =>
+    `The download link is valid for ${linkExpiryHours} hours and can be used up to ${downloadLimit} times.`,
+  footer: "If you have any questions, contact us at kundenservice@karinex.de.",
+  heading: "Your downloads & licence keys",
+  pending:
+    "Your delivery is being prepared. You will shortly receive an e-mail with your licence key and download link.",
+  legal:
+    "Downloading starts the performance of the contract. Your right of withdrawal expires pursuant to § 356 (5) German Civil Code.",
+};
+
+// Pick a string set from a Shopify/BCP-47 locale. Defaults to German.
+export function getStrings(locale?: string | null): Strings {
+  return locale && locale.toLowerCase().startsWith("en") ? en : de;
+}

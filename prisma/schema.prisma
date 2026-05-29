@@ -50,6 +50,20 @@ enum DeliveryStatus {
   FAILED
 }
 
+// --- App-wide settings (single row, id = "default") ---
+// Branding + e-mail template customisation, edited under /app/settings.
+model AppSettings {
+  id            String   @id @default("default")
+  shopName      String   @default("KARINEX")
+  brandColor    String   @default("#0b3d2e")
+  logoUrl       String?
+  supportEmail  String   @default("kundenservice@karinex.de")
+  emailIntro    String?
+  emailFooter   String?
+  defaultLocale String   @default("de")
+  updatedAt     DateTime @updatedAt @default(now())
+}
+
 // --- App data ---
 model Product {
   id               String       @id @default(cuid())

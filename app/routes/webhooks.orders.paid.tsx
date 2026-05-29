@@ -7,6 +7,7 @@ interface OrdersPaidPayload {
   name: string;
   email?: string | null;
   contact_email?: string | null;
+  customer_locale?: string | null;
   customer?: { email?: string | null } | null;
   line_items?: { product_id: number | string | null; quantity: number }[];
 }
@@ -29,6 +30,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     id: order.id,
     name: order.name,
     email,
+    locale: order.customer_locale ?? null,
     lineItems: (order.line_items ?? []).map((li) => ({
       productId: li.product_id,
       quantity: li.quantity,

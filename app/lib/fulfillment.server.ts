@@ -19,6 +19,7 @@ export interface PaidOrder {
   id: string | number;
   name: string;
   email: string;
+  locale?: string | null;
   lineItems: PaidOrderLineItem[];
 }
 
@@ -270,6 +271,7 @@ export async function fulfillPaidOrder(order: PaidOrder): Promise<void> {
       to: order.email,
       orderName: order.name,
       items: emailItems,
+      locale: order.locale,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
