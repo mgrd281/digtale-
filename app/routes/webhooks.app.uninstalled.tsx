@@ -13,5 +13,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     await db.session.deleteMany({ where: { shop } });
   }
 
+  // Reset onboarding so a fresh re-install shows the language/welcome screen
+  // again. The rest of the shop's data stays intact (full deletion happens
+  // 48h later via the shop/redact GDPR webhook).
+  await db.appSettings
+    .updateMany({ where: { shop }, data: { onboarded: false } })
+    .catch(() => {});
+
   return new Response();
 };
