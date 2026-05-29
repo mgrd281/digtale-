@@ -38,8 +38,16 @@ export async function fetchDeliveries(
     api?.order?.id ??
     "";
 
+  // Buyer locale (defensive: the shape differs per target). Lets the backend
+  // return localized strings; defaults to German when unavailable.
+  const locale: string =
+    api?.localization?.language?.current?.isoCode ??
+    api?.localization?.isoCode?.current ??
+    api?.localization?.language?.isoCode ??
+    "";
+
   const res = await fetch(
-    `${APP_URL}/api/deliveries?surface=${surface}&orderId=${encodeURIComponent(orderId)}`,
+    `${APP_URL}/api/deliveries?surface=${surface}&orderId=${encodeURIComponent(orderId)}&locale=${encodeURIComponent(locale)}`,
     { headers: { Authorization: `Bearer ${token}` } },
   );
   if (!res.ok) {

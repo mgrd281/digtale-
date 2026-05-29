@@ -12,7 +12,7 @@ export async function resendDelivery(deliveryId: string): Promise<void> {
   const delivery = await prisma.delivery.findUniqueOrThrow({
     where: { id: deliveryId },
     include: {
-      product: true,
+      product: { include: { links: { orderBy: { createdAt: "asc" } } } },
       licenseKey: true,
       tokens: { where: { revoked: false }, include: { file: true } },
     },
@@ -20,11 +20,15 @@ export async function resendDelivery(deliveryId: string): Promise<void> {
 
   const item: DeliveryEmailItem = {
     productTitle: delivery.product.title,
+    message: delivery.product.deliveryMessage,
     licenseKey: delivery.licenseKey?.keyValue ?? null,
-    downloads: delivery.tokens.map((t) => ({
-      fileName: t.file.fileName,
-      url: downloadUrl(t.token),
-    })),
+    downloads: [
+      ...delivery.product.links.map((l) => ({ fileName: l.label, url: l.url })),
+      ...delivery.tokens.map((t) => ({
+        fileName: t.file.fileName,
+        url: downloadUrl(t.token),
+      })),
+    ],
     linkExpiryHours: delivery.product.linkExpiryHours,
     downloadLimit: delivery.product.downloadLimit,
   };
