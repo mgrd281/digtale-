@@ -8,12 +8,15 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { resendDelivery, revokeDelivery } from "../lib/deliveries.server";
+import { getSettings } from "../lib/settings.server";
+import { t } from "../lib/i18n";
 import type { DeliveryStatus, Prisma } from "@prisma/client";
 
 const STATUSES: DeliveryStatus[] = ["PENDING", "DELIVERED", "FAILED"];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
+  const settings = await getSettings();
 
   const url = new URL(request.url);
   const q = url.searchParams.get("q")?.trim() ?? "";
@@ -44,6 +47,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return {
     q,
     status,
+    locale: settings.adminLocale,
     deliveries: deliveries.map((d) => ({
       id: d.id,
       orderName: d.shopifyOrderName,
@@ -60,6 +64,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   await authenticate.admin(request);
+  const { adminLocale: locale } = await getSettings();
   const formData = await request.formData();
   const intent = String(formData.get("intent"));
   const deliveryId = String(formData.get("deliveryId"));
@@ -67,23 +72,23 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   try {
     if (intent === "resend") {
       await resendDelivery(deliveryId);
-      return { ok: true, message: "E-Mail erneut gesendet." };
+      return { ok: true, message: t(locale, "deliveries.msgResent") };
     }
     if (intent === "revoke") {
       await revokeDelivery(deliveryId);
-      return { ok: true, message: "Lieferung widerrufen." };
+      return { ok: true, message: t(locale, "deliveries.msgRevoked") };
     }
     if (intent === "delete") {
       // Remove the record (download tokens cascade). The assigned key stays
       // burned so it is never reissued.
       await prisma.delivery.delete({ where: { id: deliveryId } });
-      return { ok: true, message: "Eintrag gelöscht." };
+      return { ok: true, message: t(locale, "deliveries.msgDeleted") };
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return { ok: false, message };
   }
-  return { ok: false, message: "Unbekannte Aktion." };
+  return { ok: false, message: t(locale, "deliveries.msgUnknownAction") };
 };
 
 function statusTone(status: string): "success" | "warning" | "critical" | "neutral" {
@@ -94,50 +99,50 @@ function statusTone(status: string): "success" | "warning" | "critical" | "neutr
 }
 
 export default function Deliveries() {
-  const { deliveries, q, status } = useLoaderData<typeof loader>();
+  const { deliveries, q, status, locale } = useLoaderData<typeof loader>();
   const action = useFetcher<{ ok: boolean; message: string }>();
 
   return (
-    <s-page heading="Order">
+    <s-page heading={t(locale, "deliveries.title")}>
       {action.data?.message && (
         <s-banner tone={action.data.ok ? "success" : "critical"}>
           <s-paragraph>{action.data.message}</s-paragraph>
         </s-banner>
       )}
 
-      <s-section heading="Suche">
+      <s-section heading={t(locale, "deliveries.searchSection")}>
         <Form method="get">
           <s-stack direction="inline" gap="base">
             <s-search-field
-              label="Bestellung oder E-Mail"
+              label={t(locale, "deliveries.searchLabel")}
               name="q"
               value={q}
-              placeholder="#1001 oder kunde@example.com"
+              placeholder={t(locale, "deliveries.searchPlaceholder")}
             />
-            <s-select label="Status" name="status" value={status}>
-              <s-option value="">Alle</s-option>
-              <s-option value="DELIVERED">Ausgeliefert</s-option>
-              <s-option value="PENDING">In Bearbeitung</s-option>
-              <s-option value="FAILED">Fehlgeschlagen</s-option>
+            <s-select label={t(locale, "deliveries.statusLabel")} name="status" value={status}>
+              <s-option value="">{t(locale, "deliveries.statusAll")}</s-option>
+              <s-option value="DELIVERED">{t(locale, "deliveries.statusDelivered")}</s-option>
+              <s-option value="PENDING">{t(locale, "deliveries.statusPending")}</s-option>
+              <s-option value="FAILED">{t(locale, "deliveries.statusFailed")}</s-option>
             </s-select>
-            <s-button type="submit">Filtern</s-button>
+            <s-button type="submit">{t(locale, "deliveries.filter")}</s-button>
           </s-stack>
         </Form>
       </s-section>
 
-      <s-section heading={`Ergebnisse (${deliveries.length})`}>
+      <s-section heading={`${t(locale, "deliveries.results")} (${deliveries.length})`}>
         {deliveries.length === 0 ? (
-          <s-paragraph>Keine Lieferungen gefunden.</s-paragraph>
+          <s-paragraph>{t(locale, "deliveries.none")}</s-paragraph>
         ) : (
           <s-table>
             <s-table-header-row>
-              <s-table-header>Bestellung</s-table-header>
-              <s-table-header>Kunde</s-table-header>
-              <s-table-header>Produkt</s-table-header>
-              <s-table-header>Schlüssel</s-table-header>
-              <s-table-header>Status</s-table-header>
-              <s-table-header>Datum</s-table-header>
-              <s-table-header>Aktionen</s-table-header>
+              <s-table-header>{t(locale, "deliveries.thOrder")}</s-table-header>
+              <s-table-header>{t(locale, "deliveries.thCustomer")}</s-table-header>
+              <s-table-header>{t(locale, "deliveries.thProduct")}</s-table-header>
+              <s-table-header>{t(locale, "deliveries.thKey")}</s-table-header>
+              <s-table-header>{t(locale, "deliveries.thStatus")}</s-table-header>
+              <s-table-header>{t(locale, "deliveries.thDate")}</s-table-header>
+              <s-table-header>{t(locale, "deliveries.thActions")}</s-table-header>
             </s-table-header-row>
             <s-table-body>
               {deliveries.map((d) => (
@@ -146,7 +151,7 @@ export default function Deliveries() {
                   <s-table-cell>{d.email}</s-table-cell>
                   <s-table-cell>{d.product}</s-table-cell>
                   <s-table-cell>
-                    <s-text>{d.key ?? "—"}</s-text>
+                    <s-text>{d.key ?? t(locale, "detail.dash")}</s-text>
                   </s-table-cell>
                   <s-table-cell>
                     <s-badge tone={statusTone(d.status)}>{d.status}</s-badge>
@@ -155,27 +160,27 @@ export default function Deliveries() {
                   <s-table-cell>
                     <s-stack direction="inline" gap="small-100">
                       <s-link href={`/app/deliveries/${d.id}`}>
-                        Kundenansicht
+                        {t(locale, "deliveries.customerView")}
                       </s-link>
                       <action.Form method="post">
                         <input type="hidden" name="intent" value="resend" />
                         <input type="hidden" name="deliveryId" value={d.id} />
                         <s-button type="submit" variant="tertiary">
-                          Erneut senden
+                          {t(locale, "deliveries.resend")}
                         </s-button>
                       </action.Form>
                       <action.Form method="post">
                         <input type="hidden" name="intent" value="revoke" />
                         <input type="hidden" name="deliveryId" value={d.id} />
                         <s-button type="submit" variant="tertiary" tone="critical">
-                          Widerrufen
+                          {t(locale, "deliveries.revoke")}
                         </s-button>
                       </action.Form>
                       <action.Form method="post">
                         <input type="hidden" name="intent" value="delete" />
                         <input type="hidden" name="deliveryId" value={d.id} />
                         <s-button type="submit" variant="tertiary" tone="critical">
-                          Löschen
+                          {t(locale, "deliveries.delete")}
                         </s-button>
                       </action.Form>
                     </s-stack>

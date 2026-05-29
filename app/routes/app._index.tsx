@@ -224,30 +224,43 @@ export default function Dashboard() {
       </s-link>
 
       {failedCount > 0 && !hideFailed && (
-        <s-banner tone="critical" heading="Fehlgeschlagene Lieferungen">
+        <s-banner tone="critical" heading={t(locale, "dash.failedHeading")}>
           <s-stack direction="block" gap="small-300">
             <s-paragraph>
-              {failedCount} Lieferung(en) konnten nicht ausgeliefert werden.{" "}
-              <s-link href="/app/deliveries?status=FAILED">Jetzt prüfen</s-link>.
+              {failedCount} {t(locale, "dash.failedBody")}{" "}
+              <s-link href="/app/deliveries?status=FAILED">
+                {t(locale, "dash.checkNow")}
+              </s-link>
+              .
             </s-paragraph>
             <s-button variant="tertiary" onClick={dismissFailed}>
-              ✕ Ausblenden
+              {t(locale, "dash.dismiss")}
             </s-button>
           </s-stack>
         </s-banner>
       )}
 
       {lowStock.length > 0 && !hideLowStock && (
-        <s-banner tone="warning" heading={`Niedriger Schlüsselbestand (${lowStock.length})`}>
+        <s-banner
+          tone="warning"
+          heading={`${t(locale, "dash.lowStockHeading")} (${lowStock.length})`}
+        >
           <s-stack direction="block" gap="small-300">
             <s-paragraph>
-              {lowStock.length} Produkt(e) benötigen Schlüssel, z. B.{" "}
+              {lowStock.length} {t(locale, "dash.lowStockBody")}{" "}
               {lowStock.slice(0, 3).map((p) => p.title).join(", ")}
-              {lowStock.length > 3 ? ` und ${lowStock.length - 3} weitere` : ""}.{" "}
-              <s-link href="/app/products">Produkte verwalten</s-link>.
+              {lowStock.length > 3
+                ? " " +
+                  t(locale, "dash.andMore").replace(
+                    "{n}",
+                    String(lowStock.length - 3),
+                  )
+                : ""}
+              .{" "}
+              <s-link href="/app/products">{t(locale, "dash.manage")}</s-link>.
             </s-paragraph>
             <s-button variant="tertiary" onClick={dismissLowStock}>
-              ✕ Ausblenden
+              {t(locale, "dash.dismiss")}
             </s-button>
           </s-stack>
         </s-banner>
@@ -263,18 +276,11 @@ export default function Dashboard() {
         </div>
       </s-section>
 
-      <s-section slot="aside" heading="Erste Schritte">
+      <s-section slot="aside" heading={t(locale, "dash.firstSteps")}>
         <s-ordered-list>
-          <s-list-item>
-            Unter <s-link href="/app/products">Produkte</s-link> mit Shopify
-            synchronisieren.
-          </s-list-item>
-          <s-list-item>
-            Lieferart festlegen sowie Schlüssel und Dateien hochladen.
-          </s-list-item>
-          <s-list-item>
-            Nach Zahlungseingang läuft die Auslieferung automatisch.
-          </s-list-item>
+          <s-list-item>{t(locale, "dash.step1")}</s-list-item>
+          <s-list-item>{t(locale, "dash.step2")}</s-list-item>
+          <s-list-item>{t(locale, "dash.step3")}</s-list-item>
         </s-ordered-list>
       </s-section>
     </s-page>

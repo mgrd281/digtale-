@@ -12,19 +12,23 @@ import { numericId } from "../lib/shared";
 import { getSettings } from "../lib/settings.server";
 import { t } from "../lib/i18n";
 
-function categoryOf(title: string, productType: string | null): string {
-  const t = `${title} ${productType ?? ""}`.toLowerCase();
-  if (t.includes("mac")) return "Mac";
+function categoryOf(
+  title: string,
+  productType: string | null,
+  locale: string,
+): string {
+  const hay = `${title} ${productType ?? ""}`.toLowerCase();
+  if (hay.includes("mac")) return "Mac";
   if (
-    t.includes("office") ||
-    t.includes("365") ||
-    t.includes("visio") ||
-    t.includes("project") ||
-    t.includes("access")
+    hay.includes("office") ||
+    hay.includes("365") ||
+    hay.includes("visio") ||
+    hay.includes("project") ||
+    hay.includes("access")
   )
     return "Microsoft Office";
-  if (t.includes("windows")) return "Windows";
-  return "Sonstige";
+  if (hay.includes("windows")) return "Windows";
+  return t(locale, "products.catOther");
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -69,7 +73,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       title: p.title,
       imageUrl: p.imageUrl,
       shopifyProductId: p.shopifyProductId,
-      category: categoryOf(p.title, p.productType),
+      category: categoryOf(p.title, p.productType, settings.adminLocale),
       needsKey,
       available,
       files,
@@ -183,7 +187,7 @@ function Card({ r, locale }: { r: Row; locale: string }) {
         {r.imageUrl ? (
           <img className="kx-card-img" src={r.imageUrl} alt="" loading="lazy" />
         ) : (
-          <span className="kx-card-img">Kein Bild</span>
+          <span className="kx-card-img">{t(locale, "detail.noImage")}</span>
         )}
         <div style={{ minWidth: 0 }}>
           <div className="kx-card-title">{r.title}</div>
@@ -200,11 +204,11 @@ function Card({ r, locale }: { r: Row; locale: string }) {
                 : { background: "#fde8e8", color: "#b42318" }
             }
           >
-            {r.available} Keys verfügbar
+            {r.available} {t(locale, "products.keysAvailable")}
           </span>
         ) : (
           <span className="kx-keys" style={{ background: "#eef2ff", color: "#3538cd" }}>
-            {r.links + r.files} Downloads
+            {r.links + r.files} {t(locale, "products.downloads")}
           </span>
         )}
         <span className="kx-manage">{t(locale, "products.manage")} →</span>
@@ -217,8 +221,8 @@ function Card({ r, locale }: { r: Row; locale: string }) {
   );
 }
 
-function groupByCategory(rows: Row[]): [string, Row[]][] {
-  const order = ["Windows", "Microsoft Office", "Mac", "Sonstige"];
+function groupByCategory(rows: Row[], locale: string): [string, Row[]][] {
+  const order = ["Windows", "Microsoft Office", "Mac", t(locale, "products.catOther")];
   const map = new Map<string, Row[]>();
   for (const r of rows) {
     if (!map.has(r.category)) map.set(r.category, []);
@@ -260,12 +264,12 @@ export default function Products() {
       const active = filtered.filter((r) => r.ready);
       const inactive = filtered.filter((r) => !r.ready);
       return {
-        activeGroups: groupByCategory(active),
-        inactiveGroups: groupByCategory(inactive),
+        activeGroups: groupByCategory(active, locale),
+        inactiveGroups: groupByCategory(inactive, locale),
         activeCount: active.length,
         inactiveCount: inactive.length,
       };
-    }, [rows, q]);
+    }, [rows, q, locale]);
 
   return (
     <s-page heading={t(locale, "products.title")}>
@@ -279,7 +283,9 @@ export default function Products() {
 
       {fetcher.data?.synced !== undefined && (
         <s-banner tone="success">
-          <s-paragraph>{fetcher.data.synced} Produkte synchronisiert.</s-paragraph>
+          <s-paragraph>
+            {fetcher.data.synced} {t(locale, "products.synced")}
+          </s-paragraph>
         </s-banner>
       )}
 
@@ -288,15 +294,13 @@ export default function Products() {
 
         {rows.length === 0 ? (
           <s-stack direction="block" gap="base">
-            <s-paragraph>
-              Noch keine Produkte. Synchronisieren Sie zuerst Ihren Shopify-Katalog.
-            </s-paragraph>
+            <s-paragraph>{t(locale, "products.emptyState")}</s-paragraph>
             <s-button
               variant="primary"
               onClick={() => fetcher.submit({}, { method: "POST" })}
               {...(syncing ? { loading: true } : {})}
             >
-              Mit Shopify synchronisieren
+              {t(locale, "products.sync")}
             </s-button>
           </s-stack>
         ) : (
