@@ -55,6 +55,7 @@ model Product {
   id               String       @id @default(cuid())
   shopifyProductId String       @unique
   title            String
+  imageUrl         String?
   deliveryType     DeliveryType @default(KEY)
   downloadLimit    Int          @default(3)
   linkExpiryHours  Int          @default(72)
