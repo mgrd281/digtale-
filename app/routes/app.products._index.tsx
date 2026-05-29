@@ -146,12 +146,19 @@ type Row = {
 };
 
 const CATALOG_CSS = `
-  .kx-toolbar { margin: 4px 0 8px; }
-  .kx-search {
-    width: 100%; max-width: 420px; padding: 10px 14px;
-    border: 1px solid #d8dde3; border-radius: 10px; font-size: 14px; outline: none;
-    background: #fff;
+  .kx-toolbar { margin: 6px 0 10px; }
+  .kx-searchwrap { position: relative; max-width: 440px; }
+  .kx-searchwrap .kx-ico {
+    position: absolute; left: 15px; top: 50%; transform: translateY(-50%);
+    width: 18px; height: 18px; color: #94a3b8; pointer-events: none;
   }
+  .kx-search {
+    width: 100%; box-sizing: border-box; padding: 12px 16px 12px 44px;
+    border: 1px solid #e2e8f0; border-radius: 12px; font-size: 14px; outline: none;
+    background: #fff; box-shadow: 0 1px 2px rgba(16,24,40,.04);
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  .kx-search::placeholder { color: #9aa3af; }
   .kx-search:focus { border-color: #1f48ff; box-shadow: 0 0 0 3px rgba(31,72,255,.12); }
   .kx-sec-head { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 750; color: #111827; margin: 24px 0 4px; }
   .kx-sec-count { font-size: 12px; font-weight: 700; color: #475569; background: #eef2f7; padding: 2px 9px; border-radius: 999px; }
@@ -291,13 +298,28 @@ export default function Products() {
         ) : (
           <>
             <div className="kx-toolbar">
-              <input
-                className="kx-search"
-                type="search"
-                placeholder="Suche nach Produkt …"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-              />
+              <div className="kx-searchwrap">
+                <svg
+                  className="kx-ico"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="11" cy="11" r="7" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                <input
+                  className="kx-search"
+                  type="search"
+                  placeholder="Produkt suchen …"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                />
+              </div>
             </div>
 
             <div className="kx-sec-head">

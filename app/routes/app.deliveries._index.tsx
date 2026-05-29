@@ -92,7 +92,7 @@ export default function Deliveries() {
   const action = useFetcher<{ ok: boolean; message: string }>();
 
   return (
-    <s-page heading="Lieferungen">
+    <s-page heading="Order">
       {action.data?.message && (
         <s-banner tone={action.data.ok ? "success" : "critical"}>
           <s-paragraph>{action.data.message}</s-paragraph>
