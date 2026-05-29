@@ -45,6 +45,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return {
       id: p.id,
       title: p.title,
+      imageUrl: p.imageUrl,
       deliveryType: p.deliveryType,
       available,
       assigned,
@@ -71,7 +72,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     `#graphql
     query SyncProducts {
       products(first: 250, sortKey: TITLE) {
-        edges { node { id title } }
+        edges { node { id title featuredImage { url } } }
       }
     }`,
   );
@@ -81,10 +82,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   let synced = 0;
   for (const edge of edges) {
     const node = edge.node;
+    const imageUrl = node.featuredImage?.url ?? null;
     await prisma.product.upsert({
       where: { shopifyProductId: numericId(node.id) },
-      update: { title: node.title },
-      create: { shopifyProductId: numericId(node.id), title: node.title },
+      update: { title: node.title, imageUrl },
+      create: {
+        shopifyProductId: numericId(node.id),
+        title: node.title,
+        imageUrl,
+      },
     });
     synced += 1;
   }
@@ -97,6 +103,91 @@ const DELIVERY_LABEL: Record<string, string> = {
   FILE: "Datei",
   BOTH: "Schlüssel + Datei",
 };
+
+type Row = {
+  id: string;
+  title: string;
+  imageUrl: string | null;
+  deliveryType: string;
+  available: number;
+  assigned: number;
+  files: number;
+  links: number;
+};
+
+function ProductCard({ r }: { r: Row }) {
+  const needsKey = r.deliveryType === "KEY" || r.deliveryType === "BOTH";
+  const low = needsKey && r.available < LOW_STOCK_THRESHOLD;
+  const isReady =
+    (needsKey ? r.available > 0 : true) &&
+    (r.available > 0 || r.files > 0 || r.links > 0);
+
+  const meta: string[] = [];
+  if (needsKey) meta.push(`${r.available} Schlüssel`);
+  if (r.links > 0) meta.push(`${r.links} Links`);
+  if (r.files > 0) meta.push(`${r.files} Dateien`);
+
+  return (
+    <s-box
+      minInlineSize="220px"
+      maxInlineSize="260px"
+      padding="base"
+      borderWidth="base"
+      borderRadius="base"
+      background="subdued"
+    >
+      <s-stack direction="block" gap="small-100">
+        <a
+          href={`/app/products/${r.id}`}
+          style={{
+            display: "block",
+            aspectRatio: "1 / 1",
+            borderRadius: "10px",
+            overflow: "hidden",
+            background: "#ffffff",
+            border: "1px solid rgba(0,0,0,0.08)",
+          }}
+        >
+          {r.imageUrl ? (
+            <img
+              src={r.imageUrl}
+              alt={r.title}
+              style={{ width: "100%", height: "100%", objectFit: "contain" }}
+            />
+          ) : (
+            <span
+              style={{
+                display: "flex",
+                width: "100%",
+                height: "100%",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#8a8a8a",
+                fontSize: "13px",
+              }}
+            >
+              Kein Bild
+            </span>
+          )}
+        </a>
+
+        <s-link href={`/app/products/${r.id}`}>{r.title}</s-link>
+
+        <s-stack direction="inline" gap="small-300">
+          <s-badge>{DELIVERY_LABEL[r.deliveryType] ?? r.deliveryType}</s-badge>
+          <s-badge tone={isReady ? "success" : "warning"}>
+            {isReady ? "Bereit" : "Einrichten"}
+          </s-badge>
+          {low && needsKey && <s-badge tone="critical">Niedriger Bestand</s-badge>}
+        </s-stack>
+
+        {meta.length > 0 && (
+          <s-text color="subdued">{meta.join(" · ")}</s-text>
+        )}
+      </s-stack>
+    </s-box>
+  );
+}
 
 export default function Products() {
   const { rows, ready } = useLoaderData<typeof loader>();
@@ -142,56 +233,11 @@ export default function Products() {
                 {ready} lieferbereit
               </s-badge>
             </s-stack>
-            <s-table>
-              <s-table-header-row>
-                <s-table-header>Produkt</s-table-header>
-                <s-table-header>Lieferart</s-table-header>
-                <s-table-header>Schlüssel verfügbar</s-table-header>
-                <s-table-header>Zugewiesen</s-table-header>
-                <s-table-header>Dateien</s-table-header>
-                <s-table-header>Links</s-table-header>
-                <s-table-header>Status</s-table-header>
-              </s-table-header-row>
-              <s-table-body>
-                {rows.map((r) => {
-                  const needsKey =
-                    r.deliveryType === "KEY" || r.deliveryType === "BOTH";
-                  const low = needsKey && r.available < LOW_STOCK_THRESHOLD;
-                  const isReady =
-                    (needsKey ? r.available > 0 : true) &&
-                    (r.available > 0 || r.files > 0 || r.links > 0);
-                  return (
-                    <s-table-row key={r.id}>
-                      <s-table-cell>
-                        <s-link href={`/app/products/${r.id}`}>{r.title}</s-link>
-                      </s-table-cell>
-                      <s-table-cell>
-                        <s-badge>
-                          {DELIVERY_LABEL[r.deliveryType] ?? r.deliveryType}
-                        </s-badge>
-                      </s-table-cell>
-                      <s-table-cell>
-                        {needsKey ? (
-                          <s-badge tone={low ? "warning" : "success"}>
-                            {String(r.available)}
-                          </s-badge>
-                        ) : (
-                          <s-text>—</s-text>
-                        )}
-                      </s-table-cell>
-                      <s-table-cell>{String(r.assigned)}</s-table-cell>
-                      <s-table-cell>{String(r.files)}</s-table-cell>
-                      <s-table-cell>{String(r.links)}</s-table-cell>
-                      <s-table-cell>
-                        <s-badge tone={isReady ? "success" : "warning"}>
-                          {isReady ? "Bereit" : "Einrichten"}
-                        </s-badge>
-                      </s-table-cell>
-                    </s-table-row>
-                  );
-                })}
-              </s-table-body>
-            </s-table>
+            <s-stack direction="inline" gap="base">
+              {rows.map((r) => (
+                <ProductCard key={r.id} r={r} />
+              ))}
+            </s-stack>
           </s-stack>
         )}
       </s-section>
