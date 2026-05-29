@@ -37,6 +37,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     product: {
       id: product.id,
       title: product.title,
+      imageUrl: product.imageUrl,
       deliveryType: product.deliveryType,
       downloadLimit: product.downloadLimit,
       linkExpiryHours: product.linkExpiryHours,
@@ -193,6 +194,21 @@ export default function ProductDetail() {
         Zurück
       </s-link>
 
+      {product.imageUrl && (
+        <img
+          src={product.imageUrl}
+          alt={product.title}
+          style={{
+            width: "120px",
+            height: "120px",
+            objectFit: "contain",
+            borderRadius: "12px",
+            border: "1px solid rgba(0,0,0,0.08)",
+            background: "#fff",
+          }}
+        />
+      )}
+
       {low && (
         <s-banner tone="warning" heading="Niedriger Schlüsselbestand">
           <s-paragraph>
@@ -280,14 +296,18 @@ export default function ProductDetail() {
           <s-table>
             <s-table-header-row>
               <s-table-header>Bezeichnung</s-table-header>
-              <s-table-header>URL</s-table-header>
+              <s-table-header>Link</s-table-header>
               <s-table-header></s-table-header>
             </s-table-header-row>
             <s-table-body>
               {links.map((l) => (
                 <s-table-row key={l.id}>
                   <s-table-cell>{l.label}</s-table-cell>
-                  <s-table-cell>{l.url}</s-table-cell>
+                  <s-table-cell>
+                    <s-link href={l.url} target="_blank">
+                      Öffnen
+                    </s-link>
+                  </s-table-cell>
                   <s-table-cell>
                     <linkFetcher.Form method="post">
                       <input type="hidden" name="intent" value="deleteLink" />
@@ -378,6 +398,123 @@ export default function ProductDetail() {
             </s-table-body>
           </s-table>
         )}
+      </s-section>
+
+      <s-section heading="Vorschau – so sieht es der Kunde">
+        <s-paragraph>
+          So erscheint die Auslieferung auf der Dankesseite des Kunden. Der
+          Lizenzschlüssel ist ein Beispiel – der echte Schlüssel wird beim Kauf
+          automatisch zugewiesen.
+        </s-paragraph>
+        <div
+          style={{
+            maxWidth: "520px",
+            border: "1px solid #e0e4e2",
+            borderRadius: "12px",
+            padding: "20px",
+            background: "#fafbfb",
+          }}
+        >
+          <div
+            style={{
+              fontSize: "17px",
+              fontWeight: 700,
+              color: "#0b3d2e",
+              marginBottom: "6px",
+            }}
+          >
+            {product.title}
+          </div>
+
+          {product.deliveryMessage && (
+            <div
+              style={{
+                fontSize: "14px",
+                lineHeight: 1.6,
+                color: "#444",
+                whiteSpace: "pre-line",
+                margin: "8px 0",
+              }}
+            >
+              {product.deliveryMessage}
+            </div>
+          )}
+
+          {(product.deliveryType === "KEY" ||
+            product.deliveryType === "BOTH") && (
+            <div style={{ margin: "14px 0" }}>
+              <div style={{ fontSize: "12px", color: "#777" }}>
+                Ihr Lizenzschlüssel:
+              </div>
+              <div
+                style={{
+                  fontFamily: "monospace",
+                  fontSize: "18px",
+                  fontWeight: 700,
+                  letterSpacing: "1px",
+                  background: "#f4f6f5",
+                  border: "1px solid #e0e4e2",
+                  borderRadius: "6px",
+                  padding: "10px 14px",
+                  display: "inline-block",
+                  marginTop: "4px",
+                }}
+              >
+                ABCD-1234-EFGH-5678
+              </div>
+            </div>
+          )}
+
+          <div style={{ marginTop: "8px" }}>
+            {links.map((l) => (
+              <a
+                key={l.id}
+                href={l.url}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  display: "inline-block",
+                  background: "#0b3d2e",
+                  color: "#fff",
+                  textDecoration: "none",
+                  fontWeight: 600,
+                  padding: "12px 22px",
+                  borderRadius: "8px",
+                  marginRight: "8px",
+                  marginTop: "8px",
+                }}
+              >
+                {l.label}
+              </a>
+            ))}
+            {files.map((f) => (
+              <span
+                key={f.id}
+                style={{
+                  display: "inline-block",
+                  background: "#0b3d2e",
+                  color: "#fff",
+                  fontWeight: 600,
+                  padding: "12px 22px",
+                  borderRadius: "8px",
+                  marginRight: "8px",
+                  marginTop: "8px",
+                }}
+              >
+                {f.fileName}
+              </span>
+            ))}
+          </div>
+
+          {links.length === 0 &&
+            files.length === 0 &&
+            product.deliveryType === "FILE" && (
+              <div style={{ fontSize: "13px", color: "#b00", marginTop: "8px" }}>
+                Noch keine Download-Links oder Dateien – der Kunde sieht keinen
+                Download-Button.
+              </div>
+            )}
+        </div>
       </s-section>
     </s-page>
   );
