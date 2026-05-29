@@ -78,6 +78,11 @@ model AppSettings {
   // Admin UI language (chosen on first run) + whether onboarding is done.
   adminLocale   String   @default("de")
   onboarded     Boolean  @default(false)
+  // Plan override set by KARINEX staff from the control panel:
+  //   "DEFAULT" – follow Shopify billing
+  //   "FREE"    – free forever (never gated, no charge)
+  //   "PAID"    – treated as a paying customer (counts toward MRR)
+  plan          String   @default("DEFAULT")
   // Deliver immediately when an order is *created* (e.g. Vorkasse / bank
   // transfer, before payment is confirmed) instead of only on payment.
   deliverUnpaidOrders Boolean @default(false)

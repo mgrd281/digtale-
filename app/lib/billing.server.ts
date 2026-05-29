@@ -11,6 +11,10 @@
 
 export const BILLING_ENABLED = process.env.BILLING_ENABLED === "true";
 
+// The Pro plan price (kept in sync with the billing config in shopify.server).
+export const PRO_PLAN_PRICE = 9.99;
+export const PRO_PLAN_CURRENCY = "USD";
+
 // Real charges only when explicitly enabled; otherwise Shopify test charges.
 export const BILLING_TEST = process.env.BILLING_LIVE !== "true";
 

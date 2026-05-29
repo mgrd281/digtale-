@@ -16,20 +16,21 @@ import { t, isRtl } from "../lib/i18n";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, billing } = await authenticate.admin(request);
+  const settings = await getSettings(session.shop);
 
   // Subscription gate: every embedded admin page requires an active plan.
   // Disabled by default (BILLING_ENABLED) so it's safe to ship before launch.
-  // The owner's store (and any BILLING_EXEMPT_SHOPS) is never gated. A 14-day
-  // free trial is included; charges are test until BILLING_LIVE=true.
-  if (BILLING_ENABLED && !isBillingExempt(session.shop)) {
+  // Never gated: a "FREE" or "PAID" plan set by staff in the control panel,
+  // the owner's store, or any BILLING_EXEMPT_SHOPS. A 14-day free trial is
+  // included; charges are test until BILLING_LIVE=true.
+  const planExempt = settings.plan === "FREE" || settings.plan === "PAID";
+  if (BILLING_ENABLED && !planExempt && !isBillingExempt(session.shop)) {
     await billing.require({
       plans: [PRO_PLAN],
       isTest: BILLING_TEST,
       onFailure: async () => billing.request({ plan: PRO_PLAN, isTest: BILLING_TEST }),
     });
   }
-
-  const settings = await getSettings(session.shop);
   return {
     // eslint-disable-next-line no-undef
     apiKey: process.env.SHOPIFY_API_KEY || "",

@@ -26,6 +26,7 @@ export async function updateSettings(
       | "defaultLocale"
       | "adminLocale"
       | "onboarded"
+      | "plan"
       | "deliverUnpaidOrders"
     >
   >,
