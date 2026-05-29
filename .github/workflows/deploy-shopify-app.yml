@@ -1,0 +1,36 @@
+name: Deploy Shopify app (extension + config)
+
+# Publishes the checkout extension and app configuration to Shopify whenever the
+# extension or the app config changes on the deploy branch — no local Terminal
+# needed. Runtime/server code is deployed separately by Railway.
+#
+# Requires a repository secret SHOPIFY_APP_AUTOMATION_TOKEN
+# (Dev Dashboard → Karinex Fulfillment → Einstellungen → App-Automatisierungs-Token).
+
+on:
+  push:
+    branches:
+      - claude/karinex-digital-fulfillment-4AjwD
+    paths:
+      - "extensions/**"
+      - "shopify.app.karinex-fulfillment.toml"
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: npm ci
+      - name: Deploy to Shopify
+        env:
+          SHOPIFY_APP_AUTOMATION_TOKEN: ${{ secrets.SHOPIFY_APP_AUTOMATION_TOKEN }}
+        run: |
+          npx --yes @shopify/cli@latest app deploy \
+            --config karinex-fulfillment \
+            --allow-updates \
+            --source-control-url "https://github.com/${{ github.repository }}/commit/${{ github.sha }}"
