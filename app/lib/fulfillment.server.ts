@@ -81,7 +81,7 @@ async function processProduct(
     downloadLimit: number;
     linkExpiryHours: number;
     deliveryMessage: string | null;
-    links: { label: string; url: string }[];
+    links: { label: string; version: string | null; url: string }[];
   },
 ): Promise<ProcessResult | null> {
   const shopifyOrderId = numericId(order.id);
@@ -162,7 +162,7 @@ async function processProduct(
   // 2) Downloads: static per-product links first (no storage needed), then a
   //    token for each uploaded file.
   const downloads: { fileName: string; url: string }[] = product.links.map(
-    (l) => ({ fileName: l.label, url: l.url }),
+    (l) => ({ fileName: l.version || l.label, url: l.url }),
   );
   if (wantsFile) {
     const files = await prisma.digitalFile.findMany({
@@ -243,7 +243,11 @@ export async function fulfillPaidOrder(order: PaidOrder): Promise<void> {
       downloadLimit: product.downloadLimit,
       linkExpiryHours: product.linkExpiryHours,
       deliveryMessage: product.deliveryMessage,
-      links: product.links.map((l) => ({ label: l.label, url: l.url })),
+      links: product.links.map((l) => ({
+        label: l.label,
+        version: l.version,
+        url: l.url,
+      })),
     });
     if (result && !result.failed && result.emailItem) {
       emailItems.push(result.emailItem);

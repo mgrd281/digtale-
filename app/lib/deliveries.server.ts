@@ -23,7 +23,10 @@ export async function resendDelivery(deliveryId: string): Promise<void> {
     message: delivery.product.deliveryMessage,
     licenseKey: delivery.licenseKey?.keyValue ?? null,
     downloads: [
-      ...delivery.product.links.map((l) => ({ fileName: l.label, url: l.url })),
+      ...delivery.product.links.map((l) => ({
+        fileName: l.version || l.label,
+        url: l.url,
+      })),
       ...delivery.tokens.map((t) => ({
         fileName: t.file.fileName,
         url: downloadUrl(t.token),
