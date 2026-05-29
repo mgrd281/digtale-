@@ -34,6 +34,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const assigned = await prisma.licenseKey.count({
     where: { productId: product.id, status: "ASSIGNED" },
   });
+  const availableKeys = await prisma.licenseKey.findMany({
+    where: { productId: product.id, status: "AVAILABLE" },
+    orderBy: { id: "asc" },
+    select: { id: true, keyValue: true },
+    take: 500,
+  });
 
   return {
     product: {
@@ -48,6 +54,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     },
     available,
     assigned,
+    keys: availableKeys,
     files: product.files.map((f) => ({
       id: f.id,
       fileName: f.fileName,
@@ -138,6 +145,21 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     return data({ ok: true, message: "Download-Link entfernt." });
   }
 
+  if (intent === "deleteKey") {
+    // Only unassigned keys can be removed; assigned keys stay (in use).
+    const result = await prisma.licenseKey.deleteMany({
+      where: {
+        id: String(formData.get("keyId")),
+        productId,
+        status: "AVAILABLE",
+      },
+    });
+    return data({
+      ok: result.count > 0,
+      message: result.count > 0 ? "Schlüssel entfernt." : "Schlüssel nicht gefunden.",
+    });
+  }
+
   if (intent === "keys") {
     const pasted = String(formData.get("keys") ?? "");
     const csv = formData.get("keysCsv");
@@ -217,7 +239,7 @@ const HERO_CSS = `
 `;
 
 export default function ProductDetail() {
-  const { product, available, assigned, files, links } =
+  const { product, available, assigned, keys: keyList, files, links } =
     useLoaderData<typeof loader>();
   const settings = useFetcher<typeof action>();
   const keys = useFetcher<typeof action>();
@@ -473,6 +495,33 @@ export default function ProductDetail() {
             </s-button>
           </s-stack>
         </keys.Form>
+
+        {keyList.length > 0 && (
+          <s-table>
+            <s-table-header-row>
+              <s-table-header>Verfügbare Schlüssel</s-table-header>
+              <s-table-header></s-table-header>
+            </s-table-header-row>
+            <s-table-body>
+              {keyList.map((k) => (
+                <s-table-row key={k.id}>
+                  <s-table-cell>
+                    <s-text>{k.keyValue}</s-text>
+                  </s-table-cell>
+                  <s-table-cell>
+                    <keys.Form method="post">
+                      <input type="hidden" name="intent" value="deleteKey" />
+                      <input type="hidden" name="keyId" value={k.id} />
+                      <s-button type="submit" variant="tertiary" tone="critical">
+                        Entfernen
+                      </s-button>
+                    </keys.Form>
+                  </s-table-cell>
+                </s-table-row>
+              ))}
+            </s-table-body>
+          </s-table>
+        )}
       </s-section>
 
       <s-section heading="Dateien hochladen">
