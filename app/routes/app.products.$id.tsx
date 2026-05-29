@@ -343,7 +343,7 @@ export default function ProductDetail() {
         </s-banner>
       )}
 
-      <s-section heading="Liefereinstellungen">
+      <s-section heading="⚙️ Liefereinstellungen">
         {settings.data?.message && (
           <s-banner tone={settings.data.ok ? "success" : "critical"}>
             <s-paragraph>{settings.data.message}</s-paragraph>
@@ -402,7 +402,7 @@ export default function ProductDetail() {
         </settings.Form>
       </s-section>
 
-      <s-section heading="Download-Links">
+      <s-section heading="🔗 Download-Links">
         <s-paragraph>
           Links, die dem Kunden nach dem Kauf angezeigt werden (z. B. Installer
           oder Anleitung). Es wird kein Datei-Upload benötigt – fügen Sie einfach
@@ -467,7 +467,7 @@ export default function ProductDetail() {
         )}
       </s-section>
 
-      <s-section heading="Schlüssel hochladen">
+      <s-section heading="🔑 Schlüssel">
         <s-stack direction="inline" gap="large">
           <s-badge tone={low ? "warning" : "success"}>
             Verfügbar: {String(available)}
@@ -524,7 +524,7 @@ export default function ProductDetail() {
         )}
       </s-section>
 
-      <s-section heading="Dateien hochladen">
+      <s-section heading="📁 Dateien">
         {upload.data?.message && (
           <s-banner tone={upload.data.ok ? "success" : "critical"}>
             <s-paragraph>{upload.data.message}</s-paragraph>
@@ -570,7 +570,7 @@ export default function ProductDetail() {
         )}
       </s-section>
 
-      <s-section heading="Vorschau – so sieht es der Kunde">
+      <s-section heading="👁️ Vorschau – so sieht es der Kunde">
         <s-paragraph>
           So erscheint die Auslieferung auf der Dankesseite des Kunden. Der
           Lizenzschlüssel ist ein Beispiel – der echte Schlüssel wird beim Kauf
@@ -578,13 +578,23 @@ export default function ProductDetail() {
         </s-paragraph>
         <div
           style={{
-            maxWidth: "520px",
-            border: "1px solid #e0e4e2",
-            borderRadius: "12px",
-            padding: "20px",
-            background: "#fafbfb",
+            background: "linear-gradient(135deg, #eef2f6, #f8fafc)",
+            border: "1px solid #e8edf2",
+            borderRadius: "18px",
+            padding: "26px",
           }}
         >
+          <div
+            style={{
+              maxWidth: "520px",
+              margin: "0 auto",
+              border: "1px solid #e6eaee",
+              borderRadius: "14px",
+              padding: "22px",
+              background: "#fff",
+              boxShadow: "0 8px 24px rgba(16,24,40,.08)",
+            }}
+          >
           <div
             style={{
               fontSize: "17px",
@@ -695,6 +705,7 @@ export default function ProductDetail() {
                 Download-Button.
               </div>
             )}
+          </div>
         </div>
       </s-section>
     </s-page>
