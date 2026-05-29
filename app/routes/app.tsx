@@ -5,12 +5,30 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
 import { NavMenu } from "@shopify/app-bridge-react";
 
-import { authenticate } from "../shopify.server";
+import { authenticate, PRO_PLAN } from "../shopify.server";
 import { getSettings } from "../lib/settings.server";
+import {
+  BILLING_ENABLED,
+  BILLING_TEST,
+  isBillingExempt,
+} from "../lib/billing.server";
 import { t, isRtl } from "../lib/i18n";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { session, billing } = await authenticate.admin(request);
+
+  // Subscription gate: every embedded admin page requires an active plan.
+  // Disabled by default (BILLING_ENABLED) so it's safe to ship before launch.
+  // The owner's store (and any BILLING_EXEMPT_SHOPS) is never gated. A 14-day
+  // free trial is included; charges are test until BILLING_LIVE=true.
+  if (BILLING_ENABLED && !isBillingExempt(session.shop)) {
+    await billing.require({
+      plans: [PRO_PLAN],
+      isTest: BILLING_TEST,
+      onFailure: async () => billing.request({ plan: PRO_PLAN, isTest: BILLING_TEST }),
+    });
+  }
+
   const settings = await getSettings(session.shop);
   return {
     // eslint-disable-next-line no-undef
