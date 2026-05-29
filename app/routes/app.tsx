@@ -1,16 +1,17 @@
 import { useEffect } from "react";
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { Outlet, useLoaderData, useRouteError } from "react-router";
+import { Outlet, useLoaderData, useRouteError, redirect } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
 import { NavMenu } from "@shopify/app-bridge-react";
 
-import { authenticate, PRO_PLAN } from "../shopify.server";
+import { authenticate } from "../shopify.server";
 import { getSettings } from "../lib/settings.server";
 import {
   BILLING_ENABLED,
   BILLING_TEST,
   isBillingExempt,
+  PLAN_IDS,
 } from "../lib/billing.server";
 import { t, isRtl } from "../lib/i18n";
 
@@ -21,14 +22,20 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   // Subscription gate: every embedded admin page requires an active plan.
   // Disabled by default (BILLING_ENABLED) so it's safe to ship before launch.
   // Never gated: a "FREE" or "PAID" plan set by staff in the control panel,
-  // the owner's store, or any BILLING_EXEMPT_SHOPS. A 14-day free trial is
-  // included; charges are test until BILLING_LIVE=true.
+  // the owner's store, any BILLING_EXEMPT_SHOPS, or the /app/billing page
+  // itself (so a merchant without a plan can still reach plan selection).
   const planExempt = settings.plan === "FREE" || settings.plan === "PAID";
-  if (BILLING_ENABLED && !planExempt && !isBillingExempt(session.shop)) {
+  const onBillingPage = new URL(request.url).pathname.startsWith("/app/billing");
+  if (
+    BILLING_ENABLED &&
+    !planExempt &&
+    !onBillingPage &&
+    !isBillingExempt(session.shop)
+  ) {
     await billing.require({
-      plans: [PRO_PLAN],
+      plans: PLAN_IDS,
       isTest: BILLING_TEST,
-      onFailure: async () => billing.request({ plan: PRO_PLAN, isTest: BILLING_TEST }),
+      onFailure: async () => redirect("/app/billing"),
     });
   }
   return {
@@ -55,6 +62,7 @@ export default function App() {
         </a>
         <a href="/app/products">{t(locale, "nav.products")}</a>
         <a href="/app/deliveries">{t(locale, "nav.orders")}</a>
+        <a href="/app/billing">{t(locale, "nav.abo")}</a>
         <a href="/app/settings">{t(locale, "nav.settings")}</a>
       </NavMenu>
       <Outlet />
