@@ -321,7 +321,7 @@ export default function Products() {
           <>
             <div className="kx-toolbar">
               <s-search-field
-                ref={searchRef}
+                ref={searchRef as never}
                 label={t(locale, "products.search")}
                 placeholder={t(locale, "products.search")}
               />
