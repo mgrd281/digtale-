@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
   ActionFunctionArgs,
   HeadersFunction,
@@ -188,18 +188,26 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     if (!(file instanceof File) || file.size === 0) {
       return data({ ok: false, message: "Bitte wählen Sie eine Datei aus." });
     }
-    const storageKey = `products/${productId}/${randomUUID()}-${file.name}`;
-    const buffer = Buffer.from(await file.arrayBuffer());
-    await uploadFile(storageKey, buffer, file.type || undefined);
-    await prisma.digitalFile.create({
-      data: {
-        productId,
-        fileName: file.name,
-        storageKey,
-        sizeBytes: BigInt(file.size),
-      },
-    });
-    return data({ ok: true, message: `Datei „${file.name}“ hochgeladen.` });
+    try {
+      const storageKey = `products/${productId}/${randomUUID()}-${file.name}`;
+      const buffer = Buffer.from(await file.arrayBuffer());
+      await uploadFile(storageKey, buffer, file.type || undefined);
+      await prisma.digitalFile.create({
+        data: {
+          productId,
+          fileName: file.name,
+          storageKey,
+          sizeBytes: BigInt(file.size),
+        },
+      });
+      return data({ ok: true, message: `Datei „${file.name}" hochgeladen.` });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      const hint = /S3_|storage|bucket/i.test(msg)
+        ? " Der Datei-Speicher (S3/R2) ist noch nicht eingerichtet. Nutzen Sie stattdessen Download-Links – diese funktionieren für jede Dateigröße und jedes Format."
+        : "";
+      return data({ ok: false, message: `Upload fehlgeschlagen: ${msg}.${hint}` });
+    }
   }
 
   if (intent === "deleteFile") {
@@ -282,6 +290,11 @@ export default function ProductDetail() {
       keysFormRef.current?.reset();
     }
   }, [keys.state, keys.data]);
+
+  // Modern file drop-zone state.
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadName, setUploadName] = useState("");
+  const [dragOver, setDragOver] = useState(false);
 
   const low =
     (product.deliveryType === "KEY" || product.deliveryType === "BOTH") &&
@@ -530,12 +543,55 @@ export default function ProductDetail() {
             <s-paragraph>{upload.data.message}</s-paragraph>
           </s-banner>
         )}
+        <style>{`
+          .kx-drop { border: 2px dashed #cdd5df; border-radius: 14px; padding: 26px;
+            text-align: center; cursor: pointer; background: #fafbfc;
+            transition: border-color .15s ease, background .15s ease; }
+          .kx-drop:hover, .kx-drop-on { border-color: #1f48ff; background: #f0f4ff; }
+          .kx-drop-ic { font-size: 24px; color: #94a3b8; line-height: 1; }
+          .kx-drop-t { font-weight: 650; color: #334155; margin-top: 8px; font-size: 14px; word-break: break-all; }
+          .kx-drop-s { font-size: 12px; color: #9aa3af; margin-top: 4px; }
+        `}</style>
         <upload.Form method="post" encType="multipart/form-data">
           <input type="hidden" name="intent" value="uploadFile" />
+          <input
+            ref={fileInputRef}
+            type="file"
+            name="file"
+            style={{ display: "none" }}
+            onChange={(e) => setUploadName(e.target.files?.[0]?.name ?? "")}
+          />
           <s-stack direction="block" gap="base">
-            <input type="file" name="file" />
-            <s-button type="submit" variant="primary">
-              Datei hochladen
+            <div
+              className={"kx-drop" + (dragOver ? " kx-drop-on" : "")}
+              onClick={() => fileInputRef.current?.click()}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOver(true);
+              }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOver(false);
+                const dropped = e.dataTransfer.files;
+                if (dropped?.length && fileInputRef.current) {
+                  fileInputRef.current.files = dropped;
+                  setUploadName(dropped[0].name);
+                }
+              }}
+            >
+              <div className="kx-drop-ic">⬆</div>
+              <div className="kx-drop-t">
+                {uploadName || "Datei hierher ziehen oder klicken"}
+              </div>
+              <div className="kx-drop-s">Alle Formate · z. B. .pkg .zip .exe .dmg .iso</div>
+            </div>
+            <s-button
+              type="submit"
+              variant="primary"
+              {...(upload.state !== "idle" ? { loading: true } : {})}
+            >
+              {upload.state !== "idle" ? "Wird hochgeladen …" : "Datei hochladen"}
             </s-button>
           </s-stack>
         </upload.Form>
