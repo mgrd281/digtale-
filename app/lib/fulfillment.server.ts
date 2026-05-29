@@ -241,30 +241,35 @@ export async function fulfillPaidOrder(order: PaidOrder): Promise<void> {
     }
   }
 
-  if (emailItems.length === 0) {
+  if (deliveredIds.length === 0) {
     return;
   }
 
+  // Mark the deliveries DELIVERED as soon as the keys/files are provisioned.
+  // The customer-facing Thank-you / Order-status block reads this status to
+  // reveal the licence key and download links on-page, so delivery must NOT
+  // depend on the notification e-mail succeeding (SMTP may be unconfigured).
+  await prisma.delivery.updateMany({
+    where: { id: { in: deliveredIds } },
+    data: { status: "DELIVERED", errorMessage: null },
+  });
+
+  // Best-effort notification e-mail. A failure here (e.g. SMTP not set up)
+  // must not roll back the delivery: the customer already has on-page access.
   try {
     await sendDeliveryEmail({
       to: order.email,
       orderName: order.name,
       items: emailItems,
     });
-    await prisma.delivery.updateMany({
-      where: { id: { in: deliveredIds } },
-      data: { status: "DELIVERED", errorMessage: null },
-    });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    await prisma.delivery.updateMany({
-      where: { id: { in: deliveredIds } },
-      data: { status: "FAILED", errorMessage: `E-Mail-Versand fehlgeschlagen: ${message}` },
-    });
     await sendMerchantAlert({
       subject: `E-Mail-Versand fehlgeschlagen: ${order.name}`,
-      message: `Die Liefer-E-Mail für Bestellung ${order.name} konnte nicht gesendet werden: ${message}`,
+      message:
+        `Die Liefer-E-Mail für Bestellung ${order.name} konnte nicht gesendet ` +
+        `werden: ${message}. Die Auslieferung auf der Bestellbestätigungs-Seite ` +
+        `ist davon nicht betroffen.`,
     }).catch(() => {});
-    throw error;
   }
 }

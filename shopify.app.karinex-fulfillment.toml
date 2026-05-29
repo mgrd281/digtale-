@@ -1,0 +1,47 @@
+# Configuration for the "Karinex Fulfillment" Shopify app.
+# Deploy with:  npx @shopify/cli@latest app deploy --config karinex-fulfillment
+#
+# IMPORTANT: this app's client_id is ae142adc161ddc372be207268f6873d8.
+# Railway MUST run with the matching credentials for the embedded app to load:
+#   SHOPIFY_API_KEY=ae142adc161ddc372be207268f6873d8
+#   SHOPIFY_API_SECRET=<the shpss_… secret for THIS app>
+client_id = "ae142adc161ddc372be207268f6873d8"
+name = "Karinex Fulfillment"
+application_url = "https://app-production-51af.up.railway.app"
+embedded = true
+
+[build]
+automatically_update_urls_on_dev = true
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "read_orders,read_products"
+
+[auth]
+redirect_urls = [
+  "https://app-production-51af.up.railway.app/auth/callback",
+  "https://app-production-51af.up.railway.app/auth/shopify/callback",
+  "https://app-production-51af.up.railway.app/api/auth/callback"
+]
+
+[webhooks]
+api_version = "2025-10"
+
+  # Handled by: /app/routes/webhooks.orders.paid.tsx
+  # Fires after an order is marked PAID -> triggers digital fulfillment.
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/orders/paid"
+  topics = ["orders/paid"]
+
+  # Handled by: /app/routes/webhooks.app.uninstalled.tsx
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app/uninstalled"
+  topics = ["app/uninstalled"]
+
+  # Handled by: /app/routes/webhooks.app.scopes_update.tsx
+  [[webhooks.subscriptions]]
+  topics = ["app/scopes_update"]
+  uri = "/webhooks/app/scopes_update"
+
+[pos]
+embedded = false

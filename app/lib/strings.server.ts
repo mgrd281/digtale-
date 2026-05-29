@@ -8,11 +8,11 @@ export const de = {
   emailIntro:
     "vielen Dank für Ihren Einkauf bei KARINEX. Nachfolgend finden Sie Ihren Lizenzschlüssel sowie den Download-Link zu Ihrem Produkt.",
   keyLabel: "Ihr Lizenzschlüssel:",
-  downloadButton: "Produkt herunterladen",
+  downloadButton: "Download + Anleitung",
   validityNote: (linkExpiryHours: number, downloadLimit: number) =>
     `Der Download-Link ist ${linkExpiryHours} Stunden gültig und kann bis zu ${downloadLimit}-mal genutzt werden.`,
   footer: "Bei Fragen erreichen Sie uns unter kundenservice@karinex.de.",
-  heading: "Ihr digitales Produkt",
+  heading: "Ihre Downloads & Lizenzschlüssel",
   pending:
     "Ihre Lieferung wird vorbereitet. Sie erhalten in Kürze eine E-Mail mit Ihrem Lizenzschlüssel und Download-Link.",
   // § 356 Abs. 5 BGB – start of contract performance / waiver of withdrawal.
