@@ -39,6 +39,47 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   };
 };
 
+const STAT_CSS = `
+  .kx-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 14px;
+  }
+  .kx-stat {
+    position: relative;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 18px 18px 18px 22px;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+    overflow: hidden;
+  }
+  .kx-stat::before {
+    content: "";
+    position: absolute; left: 0; top: 0; bottom: 0; width: 5px;
+    background: var(--kx-accent);
+  }
+  .kx-stat-label { font-size: 13px; color: #6b7280; font-weight: 550; }
+  .kx-stat-value { font-size: 30px; font-weight: 750; color: #111827; line-height: 1.1; margin-top: 6px; }
+`;
+
+function StatCard({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: number;
+  accent: string;
+}) {
+  return (
+    <div className="kx-stat" style={{ ["--kx-accent" as string]: accent }}>
+      <div className="kx-stat-label">{label}</div>
+      <div className="kx-stat-value">{value}</div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { productCount, failedCount, pendingCount, deliveredCount, lowStock } =
     useLoaderData<typeof loader>();
@@ -71,56 +112,13 @@ export default function Dashboard() {
       )}
 
       <s-section heading="Auf einen Blick">
-        <s-stack direction="inline" gap="base">
-          <s-box
-            padding="large"
-            borderWidth="base"
-            borderRadius="base"
-            background="subdued"
-            minInlineSize="160px"
-          >
-            <s-stack direction="block" gap="small-300">
-              <s-text color="subdued">Produkte</s-text>
-              <s-heading>{String(productCount)}</s-heading>
-            </s-stack>
-          </s-box>
-          <s-box
-            padding="large"
-            borderWidth="base"
-            borderRadius="base"
-            background="subdued"
-            minInlineSize="160px"
-          >
-            <s-stack direction="block" gap="small-300">
-              <s-text color="subdued">Ausgeliefert</s-text>
-              <s-heading>{String(deliveredCount)}</s-heading>
-            </s-stack>
-          </s-box>
-          <s-box
-            padding="large"
-            borderWidth="base"
-            borderRadius="base"
-            background="subdued"
-            minInlineSize="160px"
-          >
-            <s-stack direction="block" gap="small-300">
-              <s-text color="subdued">In Bearbeitung</s-text>
-              <s-heading>{String(pendingCount)}</s-heading>
-            </s-stack>
-          </s-box>
-          <s-box
-            padding="large"
-            borderWidth="base"
-            borderRadius="base"
-            background="subdued"
-            minInlineSize="160px"
-          >
-            <s-stack direction="block" gap="small-300">
-              <s-text color="subdued">Fehlgeschlagen</s-text>
-              <s-heading>{String(failedCount)}</s-heading>
-            </s-stack>
-          </s-box>
-        </s-stack>
+        <style>{STAT_CSS}</style>
+        <div className="kx-stats">
+          <StatCard label="Produkte" value={productCount} accent="#3538cd" />
+          <StatCard label="Ausgeliefert" value={deliveredCount} accent="#1a7f37" />
+          <StatCard label="In Bearbeitung" value={pendingCount} accent="#b54708" />
+          <StatCard label="Fehlgeschlagen" value={failedCount} accent="#b42318" />
+        </div>
       </s-section>
 
       <s-section slot="aside" heading="Erste Schritte">
