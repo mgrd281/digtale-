@@ -54,6 +54,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     links: product.links.map((l) => ({
       id: l.id,
       label: l.label,
+      version: l.version ?? "",
       url: l.url,
     })),
   };
@@ -103,35 +104,23 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   }
 
   if (intent === "addLink") {
-    // Accept many links at once: one per line, "Bezeichnung | https://..."
-    // (the label is optional and defaults to "Download").
-    const raw = String(formData.get("links") ?? "");
-    const toCreate: { label: string; url: string }[] = [];
-    const invalid: string[] = [];
-    for (const line of raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)) {
-      const sep = line.indexOf("|");
-      const label = sep >= 0 ? line.slice(0, sep).trim() : "Download";
-      const url = (sep >= 0 ? line.slice(sep + 1) : line).trim();
-      if (/^https?:\/\//i.test(url)) {
-        toCreate.push({ label: label || "Download", url });
-      } else {
-        invalid.push(line);
-      }
-    }
-    if (toCreate.length === 0) {
+    const label = String(formData.get("label") ?? "").trim() || "Download + Anleitung";
+    const version = String(formData.get("version") ?? "").trim();
+    const url = String(formData.get("url") ?? "").trim();
+    if (!/^https?:\/\//i.test(url)) {
       return data({
         ok: false,
-        message:
-          "Keine gültige URL gefunden. Format: Bezeichnung | https://… (eine pro Zeile).",
+        message: "Bitte eine gültige URL angeben (beginnt mit https://).",
       });
     }
-    await prisma.productLink.createMany({
-      data: toCreate.map((l) => ({ productId, label: l.label, url: l.url })),
+    await prisma.productLink.create({
+      data: { productId, label, version: version || null, url },
     });
-    const note = invalid.length ? ` ${invalid.length} Zeile(n) ohne gültige URL übersprungen.` : "";
     return data({
       ok: true,
-      message: `${toCreate.length} Download-Link(s) hinzugefügt.${note}`,
+      message: version
+        ? `Version „${version}" hinzugefügt.`
+        : `Download-Link hinzugefügt.`,
     });
   }
 
@@ -222,6 +211,22 @@ export default function ProductDetail() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Clear the link / key forms after a successful add, so the next entry is
+  // immediate (smoother for adding several in a row).
+  const linkFormRef = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    if (linkFetcher.state === "idle" && linkFetcher.data?.ok) {
+      linkFormRef.current?.reset();
+    }
+  }, [linkFetcher.state, linkFetcher.data]);
+
+  const keysFormRef = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    if (keys.state === "idle" && keys.data?.ok) {
+      keysFormRef.current?.reset();
+    }
+  }, [keys.state, keys.data]);
 
   const low =
     (product.deliveryType === "KEY" || product.deliveryType === "BOTH") &&
@@ -319,19 +324,22 @@ export default function ProductDetail() {
             <s-paragraph>{linkFetcher.data.message}</s-paragraph>
           </s-banner>
         )}
-        <linkFetcher.Form method="post">
+        <linkFetcher.Form method="post" ref={linkFormRef}>
           <input type="hidden" name="intent" value="addLink" />
           <s-stack direction="block" gap="base">
-            <s-text-area
-              label="Mehrere Links möglich – ein Link pro Zeile: Bezeichnung | https://…"
-              name="links"
-              rows={5}
-              placeholder={
-                "Download + Anleitung | https://example.com/setup.exe\nHandbuch (PDF) | https://example.com/handbuch.pdf"
-              }
+            <s-text-field
+              label="Versionsname"
+              name="version"
+              placeholder="z. B. Windows · 64-Bit · Deutsch"
             />
+            <s-text-field
+              label="Button-Text"
+              name="label"
+              placeholder="Download + Anleitung"
+            />
+            <s-text-field label="URL" name="url" placeholder="https://…" />
             <s-button type="submit" variant="primary">
-              Links hinzufügen
+              Link hinzufügen
             </s-button>
           </s-stack>
         </linkFetcher.Form>
@@ -339,13 +347,15 @@ export default function ProductDetail() {
         {links.length > 0 && (
           <s-table>
             <s-table-header-row>
-              <s-table-header>Bezeichnung</s-table-header>
+              <s-table-header>Version</s-table-header>
+              <s-table-header>Button-Text</s-table-header>
               <s-table-header>Link</s-table-header>
               <s-table-header></s-table-header>
             </s-table-header-row>
             <s-table-body>
               {links.map((l) => (
                 <s-table-row key={l.id}>
+                  <s-table-cell>{l.version || "—"}</s-table-cell>
                   <s-table-cell>{l.label}</s-table-cell>
                   <s-table-cell>
                     <s-link href={l.url} target="_blank">
@@ -380,7 +390,7 @@ export default function ProductDetail() {
             <s-paragraph>{keys.data.message}</s-paragraph>
           </s-banner>
         )}
-        <keys.Form method="post" encType="multipart/form-data">
+        <keys.Form method="post" encType="multipart/form-data" ref={keysFormRef}>
           <input type="hidden" name="intent" value="keys" />
           <s-stack direction="block" gap="base">
             <s-text-area
@@ -511,25 +521,36 @@ export default function ProductDetail() {
 
           <div style={{ marginTop: "8px" }}>
             {links.map((l) => (
-              <a
-                key={l.id}
-                href={l.url}
-                target="_blank"
-                rel="noreferrer"
-                style={{
-                  display: "inline-block",
-                  background: "#0b3d2e",
-                  color: "#fff",
-                  textDecoration: "none",
-                  fontWeight: 600,
-                  padding: "12px 22px",
-                  borderRadius: "8px",
-                  marginRight: "8px",
-                  marginTop: "8px",
-                }}
-              >
-                {l.label}
-              </a>
+              <div key={l.id} style={{ marginTop: "10px" }}>
+                {l.version && (
+                  <div
+                    style={{
+                      fontSize: "12px",
+                      color: "#555",
+                      marginBottom: "4px",
+                    }}
+                  >
+                    {l.version}
+                  </div>
+                )}
+                <a
+                  href={l.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    display: "inline-block",
+                    background: "#0b3d2e",
+                    color: "#fff",
+                    textDecoration: "none",
+                    fontWeight: 600,
+                    padding: "12px 22px",
+                    borderRadius: "8px",
+                    marginRight: "8px",
+                  }}
+                >
+                  {l.label}
+                </a>
+              </div>
             ))}
             {files.map((f) => (
               <span

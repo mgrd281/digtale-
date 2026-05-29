@@ -53,7 +53,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     // Static per-product links (no storage needed) shown first, then any
     // storage-backed file downloads with a live token.
     const linkDownloads = delivered
-      ? d.product.links.map((l) => ({ fileName: l.label, url: l.url }))
+      ? d.product.links.map((l) => ({ fileName: l.version || l.label, url: l.url }))
       : [];
     const fileDownloads = d.tokens
       .filter((tok) => tok.expiresAt.getTime() > now && tok.downloadCount < tok.maxDownloads)
