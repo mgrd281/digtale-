@@ -32,28 +32,38 @@ function categoryOf(
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  await authenticate.admin(request);
-  const settings = await getSettings();
+  const { session } = await authenticate.admin(request);
+  const shop = session.shop;
+  const settings = await getSettings(shop);
 
-  const products = await prisma.product.findMany({ orderBy: { title: "asc" } });
+  const products = await prisma.product.findMany({
+    where: { shop },
+    orderBy: { title: "asc" },
+  });
+  // Child tables (keys/files/links) have no shop column – they inherit scope
+  // via their product, so constrain the aggregates to this shop's products.
+  const productIds = products.map((p) => p.id);
 
   const keyCounts = await prisma.licenseKey.groupBy({
     by: ["productId", "status"],
+    where: { productId: { in: productIds } },
     _count: { _all: true },
   });
   const fileCounts = await prisma.digitalFile.groupBy({
     by: ["productId"],
+    where: { productId: { in: productIds } },
     _count: { _all: true },
   });
   const linkCounts = await prisma.productLink.groupBy({
     by: ["productId"],
+    where: { productId: { in: productIds } },
     _count: { _all: true },
   });
 
   const since = new Date(Date.now() - 30 * 24 * 3600_000);
   const sales = await prisma.delivery.groupBy({
     by: ["productId"],
-    where: { status: "DELIVERED", createdAt: { gte: since } },
+    where: { shop, status: "DELIVERED", createdAt: { gte: since } },
     _count: { _all: true },
   });
 
@@ -87,7 +97,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { admin } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
+  const shop = session.shop;
 
   const response = await admin.graphql(
     `#graphql
@@ -117,7 +128,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       node.featuredMedia?.preview?.image?.url ??
       null;
     await prisma.product.upsert({
-      where: { shopifyProductId: numericId(node.id) },
+      where: {
+        shop_shopifyProductId: { shop, shopifyProductId: numericId(node.id) },
+      },
       update: {
         title: node.title,
         imageUrl,
@@ -125,6 +138,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         vendor: node.vendor || null,
       },
       create: {
+        shop,
         shopifyProductId: numericId(node.id),
         title: node.title,
         imageUrl,

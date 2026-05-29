@@ -50,10 +50,10 @@ enum DeliveryStatus {
   FAILED
 }
 
-// --- App-wide settings (single row, id = "default") ---
+// --- Per-shop settings (one row per installed shop, keyed by shop domain) ---
 // Branding + e-mail template customisation, edited under /app/settings.
 model AppSettings {
-  id            String   @id @default("default")
+  shop          String   @id
   shopName      String   @default("KARINEX")
   brandColor    String   @default("#0b3d2e")
   logoUrl       String?
@@ -73,7 +73,10 @@ model AppSettings {
 // --- App data ---
 model Product {
   id               String       @id @default(cuid())
-  shopifyProductId String       @unique
+  // Owning shop domain (e.g. "my-store.myshopify.com"). Every query is scoped
+  // by this so multiple installed shops never see each other's data.
+  shop             String
+  shopifyProductId String
   title            String
   imageUrl         String?
   productType      String?
@@ -93,6 +96,10 @@ model Product {
   files       DigitalFile[]
   links       ProductLink[]
   deliveries  Delivery[]
+
+  // A Shopify product maps to exactly one row per shop.
+  @@unique([shop, shopifyProductId])
+  @@index([shop])
 }
 
 // Static download links shown to every customer who buys the product
@@ -114,7 +121,7 @@ model ProductLink {
 model LicenseKey {
   id              String    @id @default(cuid())
   productId       String
-  keyValue        String    @unique
+  keyValue        String
   status          KeyStatus @default(AVAILABLE)
   assignedOrderId String?
   assignedAt      DateTime?
@@ -122,6 +129,9 @@ model LicenseKey {
   product  Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
   delivery Delivery?
 
+  // Scope uniqueness to the product (which is itself shop-scoped) so the same
+  // key string can exist for different shops/products.
+  @@unique([productId, keyValue])
   @@index([productId, status])
 }
 
@@ -141,6 +151,8 @@ model DigitalFile {
 
 model Delivery {
   id               String         @id @default(cuid())
+  // Owning shop domain – scopes every delivery query per installed shop.
+  shop             String
   shopifyOrderId   String
   shopifyOrderName String
   customerEmail    String
@@ -157,8 +169,9 @@ model Delivery {
   licenseKey LicenseKey?     @relation(fields: [licenseKeyId], references: [id])
   tokens     DownloadToken[]
 
-  // Idempotency: one delivery per order + product.
-  @@unique([shopifyOrderId, productId])
+  // Idempotency: one delivery per shop + order + product.
+  @@unique([shop, shopifyOrderId, productId])
+  @@index([shop])
   @@index([shopifyOrderId])
   @@index([status])
 }

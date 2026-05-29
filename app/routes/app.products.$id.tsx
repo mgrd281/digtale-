@@ -16,11 +16,11 @@ import { getSettings } from "../lib/settings.server";
 import { t } from "../lib/i18n";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  await authenticate.admin(request);
-  const settings = await getSettings();
+  const { session } = await authenticate.admin(request);
+  const settings = await getSettings(session.shop);
 
-  const product = await prisma.product.findUnique({
-    where: { id: params.id },
+  const product = await prisma.product.findFirst({
+    where: { id: params.id, shop: session.shop },
     include: {
       files: { orderBy: { createdAt: "desc" } },
       links: { orderBy: { createdAt: "asc" } },
@@ -86,11 +86,16 @@ function parseKeys(raw: string): string[] {
 }
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
-  const { admin } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
+  const shop = session.shop;
   const productId = params.id as string;
-  const { adminLocale: locale } = await getSettings();
+  const { adminLocale: locale } = await getSettings(shop);
 
-  const product = await prisma.product.findUnique({ where: { id: productId } });
+  // Verify the product belongs to this shop; child mutations below are scoped
+  // by this (shop-owned) productId.
+  const product = await prisma.product.findFirst({
+    where: { id: productId, shop },
+  });
   if (!product) {
     throw new Response(t(locale, "common.notFound"), { status: 404 });
   }
@@ -146,8 +151,8 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   }
 
   if (intent === "deleteLink") {
-    await prisma.productLink.delete({
-      where: { id: String(formData.get("linkId")) },
+    await prisma.productLink.deleteMany({
+      where: { id: String(formData.get("linkId")), productId },
     });
     return data({ ok: true, message: t(locale, "detail.msgLinkRemoved") });
   }
@@ -227,8 +232,8 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   }
 
   if (intent === "deleteFile") {
-    await prisma.digitalFile.delete({
-      where: { id: String(formData.get("fileId")) },
+    await prisma.digitalFile.deleteMany({
+      where: { id: String(formData.get("fileId")), productId },
     });
     return data({ ok: true, message: t(locale, "detail.msgFileRemoved") });
   }

@@ -10,8 +10,8 @@ import { getSettings } from "../lib/settings.server";
 import { t, isRtl } from "../lib/i18n";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  await authenticate.admin(request);
-  const settings = await getSettings();
+  const { session } = await authenticate.admin(request);
+  const settings = await getSettings(session.shop);
   return {
     // eslint-disable-next-line no-undef
     apiKey: process.env.SHOPIFY_API_KEY || "",

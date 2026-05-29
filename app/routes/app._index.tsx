@@ -13,21 +13,23 @@ import { getSettings, updateSettings } from "../lib/settings.server";
 import { LOCALES, t, type TKey } from "../lib/i18n";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
   const form = await request.formData();
   if (String(form.get("intent")) === "onboard") {
     const adminLocale = String(form.get("adminLocale") || "de");
-    await updateSettings({ adminLocale, onboarded: true });
+    await updateSettings(session.shop, { adminLocale, onboarded: true });
   }
   return { ok: true };
 };
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  await authenticate.admin(request);
-  const settings = await getSettings();
+  const { session } = await authenticate.admin(request);
+  const shop = session.shop;
+  const settings = await getSettings(shop);
 
   const [products, failedCount, pendingCount, deliveredCount] = await Promise.all([
     prisma.product.findMany({
+      where: { shop },
       orderBy: { title: "asc" },
       include: {
         _count: {
@@ -35,9 +37,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         },
       },
     }),
-    prisma.delivery.count({ where: { status: "FAILED" } }),
-    prisma.delivery.count({ where: { status: "PENDING" } }),
-    prisma.delivery.count({ where: { status: "DELIVERED" } }),
+    prisma.delivery.count({ where: { shop, status: "FAILED" } }),
+    prisma.delivery.count({ where: { shop, status: "PENDING" } }),
+    prisma.delivery.count({ where: { shop, status: "DELIVERED" } }),
   ]);
 
   const lowStock = products

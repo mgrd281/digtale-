@@ -1,17 +1,19 @@
 import prisma from "../db.server";
 import type { AppSettings } from "@prisma/client";
 
-// App-wide branding / e-mail settings live in a single row (id = "default").
-// getSettings upserts it so the app always has sensible defaults.
-export async function getSettings(): Promise<AppSettings> {
+// Per-shop branding / e-mail settings live in one row per installed shop,
+// keyed by the shop domain. getSettings upserts it so every shop always has
+// sensible defaults on first access.
+export async function getSettings(shop: string): Promise<AppSettings> {
   return prisma.appSettings.upsert({
-    where: { id: "default" },
+    where: { shop },
     update: {},
-    create: { id: "default" },
+    create: { shop },
   });
 }
 
 export async function updateSettings(
+  shop: string,
   data: Partial<
     Pick<
       AppSettings,
@@ -29,8 +31,8 @@ export async function updateSettings(
   >,
 ): Promise<AppSettings> {
   return prisma.appSettings.upsert({
-    where: { id: "default" },
+    where: { shop },
     update: data,
-    create: { id: "default", ...data },
+    create: { shop, ...data },
   });
 }
