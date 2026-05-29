@@ -1,5 +1,5 @@
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { useLoaderData, Link } from "react-router";
+import { useLoaderData } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
@@ -53,7 +53,7 @@ export default function Dashboard() {
         <s-banner tone="critical" heading="Fehlgeschlagene Lieferungen">
           <s-paragraph>
             {failedCount} Lieferung(en) konnten nicht ausgeliefert werden.{" "}
-            <Link to="/app/deliveries?status=FAILED">Jetzt prüfen</Link>.
+            <s-link href="/app/deliveries?status=FAILED">Jetzt prüfen</s-link>.
           </s-paragraph>
         </s-banner>
       )}
@@ -71,22 +71,54 @@ export default function Dashboard() {
       )}
 
       <s-section heading="Auf einen Blick">
-        <s-stack direction="inline" gap="large">
-          <s-box padding="base" borderWidth="base" borderRadius="base">
-            <s-text>Produkte</s-text>
-            <s-heading>{String(productCount)}</s-heading>
+        <s-stack direction="inline" gap="base">
+          <s-box
+            padding="large"
+            borderWidth="base"
+            borderRadius="base"
+            background="subdued"
+            minInlineSize="160px"
+          >
+            <s-stack direction="block" gap="small-300">
+              <s-text color="subdued">Produkte</s-text>
+              <s-heading>{String(productCount)}</s-heading>
+            </s-stack>
           </s-box>
-          <s-box padding="base" borderWidth="base" borderRadius="base">
-            <s-text>Ausgeliefert</s-text>
-            <s-heading>{String(deliveredCount)}</s-heading>
+          <s-box
+            padding="large"
+            borderWidth="base"
+            borderRadius="base"
+            background="subdued"
+            minInlineSize="160px"
+          >
+            <s-stack direction="block" gap="small-300">
+              <s-text color="subdued">Ausgeliefert</s-text>
+              <s-heading>{String(deliveredCount)}</s-heading>
+            </s-stack>
           </s-box>
-          <s-box padding="base" borderWidth="base" borderRadius="base">
-            <s-text>In Bearbeitung</s-text>
-            <s-heading>{String(pendingCount)}</s-heading>
+          <s-box
+            padding="large"
+            borderWidth="base"
+            borderRadius="base"
+            background="subdued"
+            minInlineSize="160px"
+          >
+            <s-stack direction="block" gap="small-300">
+              <s-text color="subdued">In Bearbeitung</s-text>
+              <s-heading>{String(pendingCount)}</s-heading>
+            </s-stack>
           </s-box>
-          <s-box padding="base" borderWidth="base" borderRadius="base">
-            <s-text>Fehlgeschlagen</s-text>
-            <s-heading>{String(failedCount)}</s-heading>
+          <s-box
+            padding="large"
+            borderWidth="base"
+            borderRadius="base"
+            background="subdued"
+            minInlineSize="160px"
+          >
+            <s-stack direction="block" gap="small-300">
+              <s-text color="subdued">Fehlgeschlagen</s-text>
+              <s-heading>{String(failedCount)}</s-heading>
+            </s-stack>
           </s-box>
         </s-stack>
       </s-section>

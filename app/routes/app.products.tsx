@@ -26,6 +26,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     _count: { _all: true },
   });
 
+  const linkCounts = await prisma.productLink.groupBy({
+    by: ["productId"],
+    _count: { _all: true },
+  });
+
   const rows = products.map((p) => {
     const available =
       counts.find((c) => c.productId === p.id && c.status === "AVAILABLE")
@@ -35,6 +40,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         ?._count._all ?? 0;
     const files =
       fileCounts.find((c) => c.productId === p.id)?._count._all ?? 0;
+    const links =
+      linkCounts.find((c) => c.productId === p.id)?._count._all ?? 0;
     return {
       id: p.id,
       title: p.title,
@@ -42,10 +49,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       available,
       assigned,
       files,
+      links,
     };
   });
 
-  return { rows };
+  // A product is "ready" once it can actually deliver something: a key in
+  // stock (for key products), a file, or a download link.
+  const ready = rows.filter((r) => {
+    const needsKey = r.deliveryType === "KEY" || r.deliveryType === "BOTH";
+    return (needsKey ? r.available > 0 : true) && (r.available > 0 || r.files > 0 || r.links > 0);
+  }).length;
+
+  return { rows, ready };
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -77,8 +92,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   return { synced };
 };
 
+const DELIVERY_LABEL: Record<string, string> = {
+  KEY: "Schlüssel",
+  FILE: "Datei",
+  BOTH: "Schlüssel + Datei",
+};
+
 export default function Products() {
-  const { rows } = useLoaderData<typeof loader>();
+  const { rows, ready } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const syncing = fetcher.state !== "idle";
 
@@ -100,43 +121,78 @@ export default function Products() {
 
       <s-section heading="Katalog">
         {rows.length === 0 ? (
-          <s-paragraph>
-            Noch keine Produkte. Klicken Sie auf „Mit Shopify synchronisieren“.
-          </s-paragraph>
+          <s-stack direction="block" gap="base">
+            <s-paragraph>
+              Noch keine Produkte vorhanden. Synchronisieren Sie zuerst Ihren
+              Shopify-Katalog.
+            </s-paragraph>
+            <s-button
+              variant="primary"
+              onClick={() => fetcher.submit({}, { method: "POST" })}
+              {...(syncing ? { loading: true } : {})}
+            >
+              Mit Shopify synchronisieren
+            </s-button>
+          </s-stack>
         ) : (
-          <s-table>
-            <s-table-header-row>
-              <s-table-header>Produkt</s-table-header>
-              <s-table-header>Lieferart</s-table-header>
-              <s-table-header>Verfügbar</s-table-header>
-              <s-table-header>Zugewiesen</s-table-header>
-              <s-table-header>Dateien</s-table-header>
-            </s-table-header-row>
-            <s-table-body>
-              {rows.map((r) => {
-                const low =
-                  (r.deliveryType === "KEY" || r.deliveryType === "BOTH") &&
-                  r.available < LOW_STOCK_THRESHOLD;
-                return (
-                  <s-table-row key={r.id}>
-                    <s-table-cell>
-                      <s-link href={`/app/products/${r.id}`}>{r.title}</s-link>
-                    </s-table-cell>
-                    <s-table-cell>
-                      <s-badge>{r.deliveryType}</s-badge>
-                    </s-table-cell>
-                    <s-table-cell>
-                      <s-badge tone={low ? "warning" : "success"}>
-                        {String(r.available)}
-                      </s-badge>
-                    </s-table-cell>
-                    <s-table-cell>{String(r.assigned)}</s-table-cell>
-                    <s-table-cell>{String(r.files)}</s-table-cell>
-                  </s-table-row>
-                );
-              })}
-            </s-table-body>
-          </s-table>
+          <s-stack direction="block" gap="base">
+            <s-stack direction="inline" gap="small">
+              <s-badge tone="info">{rows.length} Produkte</s-badge>
+              <s-badge tone={ready === rows.length ? "success" : "warning"}>
+                {ready} lieferbereit
+              </s-badge>
+            </s-stack>
+            <s-table>
+              <s-table-header-row>
+                <s-table-header>Produkt</s-table-header>
+                <s-table-header>Lieferart</s-table-header>
+                <s-table-header>Schlüssel verfügbar</s-table-header>
+                <s-table-header>Zugewiesen</s-table-header>
+                <s-table-header>Dateien</s-table-header>
+                <s-table-header>Links</s-table-header>
+                <s-table-header>Status</s-table-header>
+              </s-table-header-row>
+              <s-table-body>
+                {rows.map((r) => {
+                  const needsKey =
+                    r.deliveryType === "KEY" || r.deliveryType === "BOTH";
+                  const low = needsKey && r.available < LOW_STOCK_THRESHOLD;
+                  const isReady =
+                    (needsKey ? r.available > 0 : true) &&
+                    (r.available > 0 || r.files > 0 || r.links > 0);
+                  return (
+                    <s-table-row key={r.id}>
+                      <s-table-cell>
+                        <s-link href={`/app/products/${r.id}`}>{r.title}</s-link>
+                      </s-table-cell>
+                      <s-table-cell>
+                        <s-badge>
+                          {DELIVERY_LABEL[r.deliveryType] ?? r.deliveryType}
+                        </s-badge>
+                      </s-table-cell>
+                      <s-table-cell>
+                        {needsKey ? (
+                          <s-badge tone={low ? "warning" : "success"}>
+                            {String(r.available)}
+                          </s-badge>
+                        ) : (
+                          <s-text>—</s-text>
+                        )}
+                      </s-table-cell>
+                      <s-table-cell>{String(r.assigned)}</s-table-cell>
+                      <s-table-cell>{String(r.files)}</s-table-cell>
+                      <s-table-cell>{String(r.links)}</s-table-cell>
+                      <s-table-cell>
+                        <s-badge tone={isReady ? "success" : "warning"}>
+                          {isReady ? "Bereit" : "Einrichten"}
+                        </s-badge>
+                      </s-table-cell>
+                    </s-table-row>
+                  );
+                })}
+              </s-table-body>
+            </s-table>
+          </s-stack>
         )}
       </s-section>
     </s-page>
