@@ -1,7 +1,6 @@
 import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import { fulfillPaidOrder, type PaidOrder } from "../lib/fulfillment.server";
-import { getSettings } from "../lib/settings.server";
 
 interface OrdersCreatePayload {
   id: number | string;
@@ -19,11 +18,6 @@ interface OrdersCreatePayload {
 // for the same order is a safe no-op.
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { topic, shop, payload } = await authenticate.webhook(request);
-
-  const settings = await getSettings();
-  if (!settings.deliverUnpaidOrders) {
-    return new Response();
-  }
 
   const order = payload as OrdersCreatePayload;
   const email =
@@ -44,7 +38,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   };
 
   try {
-    await fulfillPaidOrder(paid);
+    // unpaidMode: only products opted into Vorkasse (globally or per product)
+    // are delivered here.
+    await fulfillPaidOrder(paid, { unpaidMode: true });
   } catch (error) {
     console.error(`[${topic}] ${shop} fulfillment error for ${order.name}:`, error);
   }

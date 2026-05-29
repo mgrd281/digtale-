@@ -1,5 +1,6 @@
 import prisma from "../db.server";
 import { env } from "./env.server";
+import { getSettings } from "./settings.server";
 import { generateDownloadToken } from "./tokens.server";
 import { numericId, LOW_STOCK_THRESHOLD } from "./shared";
 import {
@@ -215,8 +216,13 @@ async function processProduct(
   };
 }
 
-// Entry point invoked by the orders/paid webhook handler.
-export async function fulfillPaidOrder(order: PaidOrder): Promise<void> {
+// Entry point invoked by the orders/paid (and, in unpaidMode, orders/create)
+// webhook handlers. In unpaidMode only products opted into Vorkasse delivery
+// (globally or per product) are delivered.
+export async function fulfillPaidOrder(
+  order: PaidOrder,
+  opts: { unpaidMode?: boolean } = {},
+): Promise<void> {
   const wantedIds = Array.from(
     new Set(order.lineItems.map((li) => numericId(li.productId)).filter(Boolean)),
   );
@@ -224,12 +230,22 @@ export async function fulfillPaidOrder(order: PaidOrder): Promise<void> {
     return;
   }
 
-  const products = await prisma.product.findMany({
+  let products = await prisma.product.findMany({
     where: { shopifyProductId: { in: wantedIds } },
     include: { links: { orderBy: { createdAt: "asc" } } },
   });
   if (products.length === 0) {
     return; // none of the purchased items are digital products we manage
+  }
+
+  if (opts.unpaidMode) {
+    const settings = await getSettings();
+    products = products.filter(
+      (p) => settings.deliverUnpaidOrders || p.deliverUnpaid,
+    );
+    if (products.length === 0) {
+      return; // nothing opted into pre-payment (Vorkasse) delivery
+    }
   }
 
   const emailItems: DeliveryEmailItem[] = [];

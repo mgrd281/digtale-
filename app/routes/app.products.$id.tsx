@@ -10,6 +10,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { uploadFile } from "../lib/storage.server";
+import { ensureOrdersCreateWebhook } from "../lib/webhooks.server";
 import { LOW_STOCK_THRESHOLD } from "../lib/shared";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
@@ -42,6 +43,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       deliveryType: product.deliveryType,
       downloadLimit: product.downloadLimit,
       linkExpiryHours: product.linkExpiryHours,
+      deliverUnpaid: product.deliverUnpaid,
       deliveryMessage: product.deliveryMessage ?? "",
     },
     available,
@@ -73,7 +75,7 @@ function parseKeys(raw: string): string[] {
 }
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
-  await authenticate.admin(request);
+  const { admin } = await authenticate.admin(request);
   const productId = params.id as string;
 
   const product = await prisma.product.findUnique({ where: { id: productId } });
@@ -85,6 +87,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   const intent = String(formData.get("intent"));
 
   if (intent === "settings") {
+    const deliverUnpaid = formData.get("deliverUnpaid") === "true";
     await prisma.product.update({
       where: { id: productId },
       data: {
@@ -97,9 +100,13 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
           1,
           Number(formData.get("linkExpiryHours")) || 1,
         ),
+        deliverUnpaid,
         deliveryMessage: String(formData.get("deliveryMessage") ?? "").trim() || null,
       },
     });
+    if (deliverUnpaid) {
+      await ensureOrdersCreateWebhook(admin);
+    }
     return data({ ok: true, message: "Einstellungen gespeichert." });
   }
 
@@ -344,6 +351,14 @@ export default function ProductDetail() {
               value={String(product.linkExpiryHours)}
               min={1}
             />
+            <s-select
+              label="Sofort-Auslieferung bei Vorkasse (vor Zahlung)"
+              name="deliverUnpaid"
+              value={product.deliverUnpaid ? "true" : "false"}
+            >
+              <s-option value="false">Nein – erst nach Zahlungseingang</s-option>
+              <s-option value="true">Ja – sofort bei Bestellung</s-option>
+            </s-select>
             <s-text-area
               label="Nachricht an den Kunden (optional)"
               name="deliveryMessage"
