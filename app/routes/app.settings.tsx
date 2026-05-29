@@ -10,9 +10,36 @@ import { authenticate } from "../shopify.server";
 import { getSettings, updateSettings } from "../lib/settings.server";
 import { sendTestEmail } from "../lib/email.server";
 
+// Register the orders/create webhook via the API so Vorkasse delivery works
+// without a CLI config deploy. Idempotent + best-effort.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function ensureOrdersCreateWebhook(admin: any) {
+  const appUrl = (process.env.SHOPIFY_APP_URL ?? "").replace(/\/$/, "");
+  if (!appUrl) return;
+  try {
+    await admin.graphql(
+      `#graphql
+      mutation RegisterOrdersCreate($url: URL!) {
+        webhookSubscriptionCreate(
+          topic: ORDERS_CREATE
+          webhookSubscription: { callbackUrl: $url, format: JSON }
+        ) {
+          userErrors { message }
+        }
+      }`,
+      { variables: { url: `${appUrl}/webhooks/orders/create` } },
+    );
+  } catch {
+    // A duplicate subscription just means it's already registered.
+  }
+}
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  await authenticate.admin(request);
+  const { admin } = await authenticate.admin(request);
   const s = await getSettings();
+  if (s.deliverUnpaidOrders) {
+    await ensureOrdersCreateWebhook(admin);
+  }
   return {
     settings: {
       shopName: s.shopName,
@@ -28,7 +55,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  await authenticate.admin(request);
+  const { admin } = await authenticate.admin(request);
   const form = await request.formData();
   const intent = String(form.get("intent"));
 
@@ -40,6 +67,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         message: "Markenfarbe muss ein Hex-Wert sein, z. B. #0b3d2e.",
       });
     }
+    const deliverUnpaidOrders = form.get("deliverUnpaidOrders") === "true";
     await updateSettings({
       shopName: String(form.get("shopName") ?? "").trim() || "KARINEX",
       brandColor,
@@ -50,8 +78,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       emailIntro: String(form.get("emailIntro") ?? "").trim() || null,
       emailFooter: String(form.get("emailFooter") ?? "").trim() || null,
       defaultLocale: String(form.get("defaultLocale") ?? "de"),
-      deliverUnpaidOrders: form.get("deliverUnpaidOrders") === "true",
+      deliverUnpaidOrders,
     });
+
+    // When delivering on unpaid orders (Vorkasse), make sure the orders/create
+    // webhook is registered via the API so it works without a CLI deploy.
+    if (deliverUnpaidOrders) {
+      await ensureOrdersCreateWebhook(admin);
+    }
     return data({ ok: true, message: "Einstellungen gespeichert." });
   }
 

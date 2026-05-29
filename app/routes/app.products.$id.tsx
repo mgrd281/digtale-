@@ -183,6 +183,32 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   return data({ ok: false, message: "Unbekannte Aktion." }, { status: 400 });
 };
 
+const DETAIL_DELIVERY_LABEL: Record<string, string> = {
+  KEY: "Lizenzschlüssel",
+  FILE: "Datei-Download",
+  BOTH: "Schlüssel + Datei",
+};
+
+const HERO_CSS = `
+  .kx-hero {
+    display: flex; gap: 18px; align-items: center;
+    background: linear-gradient(135deg, #ffffff, #f6f8fb);
+    border: 1px solid #e5e7eb; border-radius: 18px; padding: 18px 20px;
+    box-shadow: 0 1px 2px rgba(16,24,40,.05);
+  }
+  .kx-hero-thumb {
+    width: 88px; height: 88px; flex: 0 0 auto; border-radius: 14px;
+    background: #fff; border: 1px solid #eceff2; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .kx-hero-thumb img { width: 100%; height: 100%; object-fit: contain; padding: 6px; box-sizing: border-box; }
+  .kx-hero-noimg { font-size: 11px; color: #9aa3af; }
+  .kx-hero-info { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .kx-hero-title { font-size: 17px; font-weight: 700; color: #111827; line-height: 1.3; }
+  .kx-hero-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+  .kx-pill { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+`;
+
 export default function ProductDetail() {
   const { product, available, assigned, files, links } =
     useLoaderData<typeof loader>();
@@ -238,19 +264,45 @@ export default function ProductDetail() {
         Zurück
       </s-link>
 
-      {product.imageUrl && (
-        <img
-          src={product.imageUrl}
-          alt={product.title}
-          style={{
-            width: "120px",
-            height: "120px",
-            objectFit: "contain",
-            borderRadius: "12px",
-            border: "1px solid rgba(0,0,0,0.08)",
-            background: "#fff",
-          }}
-        />
+      {product.imageUrl !== undefined && (
+        <>
+          <style>{HERO_CSS}</style>
+          <div className="kx-hero">
+            <div className="kx-hero-thumb">
+              {product.imageUrl ? (
+                <img src={product.imageUrl} alt={product.title} />
+              ) : (
+                <span className="kx-hero-noimg">Kein Bild</span>
+              )}
+            </div>
+            <div className="kx-hero-info">
+              <div className="kx-hero-title">{product.title}</div>
+              <div className="kx-hero-badges">
+                <span className="kx-pill" style={{ background: "#eef2ff", color: "#3538cd" }}>
+                  {DETAIL_DELIVERY_LABEL[product.deliveryType] ?? product.deliveryType}
+                </span>
+                {(product.deliveryType === "KEY" ||
+                  product.deliveryType === "BOTH") && (
+                  <span
+                    className="kx-pill"
+                    style={
+                      low
+                        ? { background: "#fde8e8", color: "#b42318" }
+                        : { background: "#e7f7ec", color: "#1a7f37" }
+                    }
+                  >
+                    {available} Schlüssel verfügbar
+                  </span>
+                )}
+                {links.length > 0 && (
+                  <span className="kx-pill" style={{ background: "#f1f5f9", color: "#334155" }}>
+                    {links.length} Download-Link(s)
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
       {low && (
