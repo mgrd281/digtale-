@@ -4,11 +4,12 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { env } from "../lib/env.server";
+import { generateDownloadToken } from "../lib/tokens.server";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
 
-  const delivery = await prisma.delivery.findUnique({
+  let delivery = await prisma.delivery.findUnique({
     where: { id: params.id },
     include: {
       product: { include: { links: { orderBy: { createdAt: "asc" } } } },
@@ -18,6 +19,22 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   });
   if (!delivery) {
     throw new Response("Lieferung nicht gefunden", { status: 404 });
+  }
+
+  // Backfill the public share token for older deliveries.
+  if (!delivery.accessToken) {
+    await prisma.delivery.update({
+      where: { id: delivery.id },
+      data: { accessToken: generateDownloadToken() },
+    });
+    delivery = (await prisma.delivery.findUnique({
+      where: { id: params.id },
+      include: {
+        product: { include: { links: { orderBy: { createdAt: "asc" } } } },
+        licenseKey: true,
+        tokens: { include: { file: true } },
+      },
+    }))!;
   }
 
   const downloads = [
@@ -43,6 +60,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     message: delivery.product.deliveryMessage,
     licenseKey: delivery.licenseKey?.keyValue ?? null,
     downloads,
+    publicUrl: `${env.appUrl}/delivery/${delivery.accessToken}`,
   };
 };
 
@@ -70,6 +88,40 @@ export default function DeliveryCustomerView() {
             {d.status}
           </s-badge>
         </s-stack>
+      </s-section>
+
+      <s-section heading="Öffentlicher Link (wie der Kunde ihn sieht)">
+        <s-paragraph>
+          Dieser Link öffnet die Lieferseite direkt – ohne Login. Zum Ansehen
+          oder erneuten Teilen mit dem Kunden.
+        </s-paragraph>
+        <div
+          style={{
+            display: "flex",
+            gap: "8px",
+            alignItems: "center",
+            flexWrap: "wrap",
+          }}
+        >
+          <input
+            readOnly
+            value={d.publicUrl}
+            onFocus={(e) => e.currentTarget.select()}
+            style={{
+              flex: "1 1 320px",
+              minWidth: "260px",
+              padding: "10px 12px",
+              border: "1px solid #d8dde3",
+              borderRadius: "9px",
+              fontSize: "13px",
+              color: "#334155",
+              background: "#fff",
+            }}
+          />
+          <s-link href={d.publicUrl} target="_blank">
+            Öffnen
+          </s-link>
+        </div>
       </s-section>
 
       <s-section heading="Kundenansicht – Dankesseite">
