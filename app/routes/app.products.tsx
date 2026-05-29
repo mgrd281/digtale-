@@ -3,7 +3,7 @@ import type {
   HeadersFunction,
   LoaderFunctionArgs,
 } from "react-router";
-import { useLoaderData, useFetcher, Link } from "react-router";
+import { useLoaderData, useFetcher } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
@@ -120,7 +120,7 @@ export default function Products() {
                 return (
                   <s-table-row key={r.id}>
                     <s-table-cell>
-                      <Link to={`/app/products/${r.id}`}>{r.title}</Link>
+                      <s-link href={`/app/products/${r.id}`}>{r.title}</s-link>
                     </s-table-cell>
                     <s-table-cell>
                       <s-badge>{r.deliveryType}</s-badge>

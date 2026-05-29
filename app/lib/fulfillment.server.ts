@@ -133,7 +133,7 @@ async function processProduct(
             `Bestellung ${order.name} konnte nicht ausgeliefert werden: ` +
             `für das Produkt "${product.title}" ist kein Lizenzschlüssel mehr verfügbar. ` +
             `Bitte laden Sie neue Schlüssel im Admin hoch.`,
-        });
+        }).catch(() => {});
         return { deliveryId: delivery.id, failed: true };
       }
       // Attach only if no key is set yet. If a concurrent run won the race,
