@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
 import { Outlet, useLoaderData, useRouteError } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
@@ -5,26 +6,37 @@ import { AppProvider } from "@shopify/shopify-app-react-router/react";
 import { NavMenu } from "@shopify/app-bridge-react";
 
 import { authenticate } from "../shopify.server";
+import { getSettings } from "../lib/settings.server";
+import { t, isRtl } from "../lib/i18n";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
-
-  // eslint-disable-next-line no-undef
-  return { apiKey: process.env.SHOPIFY_API_KEY || "" };
+  const settings = await getSettings();
+  return {
+    // eslint-disable-next-line no-undef
+    apiKey: process.env.SHOPIFY_API_KEY || "",
+    locale: settings.adminLocale,
+  };
 };
 
 export default function App() {
-  const { apiKey } = useLoaderData<typeof loader>();
+  const { apiKey, locale } = useLoaderData<typeof loader>();
+
+  // Flip the embedded document to RTL for Arabic.
+  useEffect(() => {
+    document.documentElement.dir = isRtl(locale) ? "rtl" : "ltr";
+    document.documentElement.lang = locale;
+  }, [locale]);
 
   return (
     <AppProvider embedded apiKey={apiKey}>
       <NavMenu>
         <a href="/app" rel="home">
-          Übersicht
+          {t(locale, "nav.overview")}
         </a>
-        <a href="/app/products">Produkte</a>
-        <a href="/app/deliveries">Order</a>
-        <a href="/app/settings">Einstellungen</a>
+        <a href="/app/products">{t(locale, "nav.products")}</a>
+        <a href="/app/deliveries">{t(locale, "nav.orders")}</a>
+        <a href="/app/settings">{t(locale, "nav.settings")}</a>
       </NavMenu>
       <Outlet />
     </AppProvider>

@@ -9,6 +9,8 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { numericId } from "../lib/shared";
+import { getSettings } from "../lib/settings.server";
+import { t } from "../lib/i18n";
 
 function categoryOf(title: string, productType: string | null): string {
   const t = `${title} ${productType ?? ""}`.toLowerCase();
@@ -27,6 +29,7 @@ function categoryOf(title: string, productType: string | null): string {
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
+  const settings = await getSettings();
 
   const products = await prisma.product.findMany({ orderBy: { title: "asc" } });
 
@@ -76,7 +79,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     };
   });
 
-  return { rows };
+  return { rows, locale: settings.adminLocale };
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -173,7 +176,7 @@ const CATALOG_CSS = `
   .kx-empty { color: #6b7280; font-size: 13px; padding: 10px 0; }
 `;
 
-function Card({ r }: { r: Row }) {
+function Card({ r, locale }: { r: Row; locale: string }) {
   return (
     <Link className="kx-card" to={`/app/products/${r.id}`}>
       <div className="kx-card-top">
@@ -204,10 +207,10 @@ function Card({ r }: { r: Row }) {
             {r.links + r.files} Downloads
           </span>
         )}
-        <span className="kx-manage">Verwalten →</span>
+        <span className="kx-manage">{t(locale, "products.manage")} →</span>
       </div>
       <div className="kx-sold">
-        <span>Verkauft (30 Tage)</span>
+        <span>{t(locale, "products.sold30")}</span>
         <b>{r.sales30}</b>
       </div>
     </Link>
@@ -227,7 +230,7 @@ function groupByCategory(rows: Row[]): [string, Row[]][] {
 }
 
 export default function Products() {
-  const { rows } = useLoaderData<typeof loader>();
+  const { rows, locale } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const syncing = fetcher.state !== "idle";
   const [q, setQ] = useState("");
@@ -265,13 +268,13 @@ export default function Products() {
     }, [rows, q]);
 
   return (
-    <s-page heading="Digitale Produkte">
+    <s-page heading={t(locale, "products.title")}>
       <s-button
         slot="primary-action"
         onClick={() => fetcher.submit({}, { method: "POST" })}
         {...(syncing ? { loading: true } : {})}
       >
-        Mit Shopify synchronisieren
+        {t(locale, "products.sync")}
       </s-button>
 
       {fetcher.data?.synced !== undefined && (
@@ -301,28 +304,27 @@ export default function Products() {
             <div className="kx-toolbar">
               <s-search-field
                 ref={searchRef}
-                label="Suche"
-                placeholder="Produkt suchen …"
+                label={t(locale, "products.search")}
+                placeholder={t(locale, "products.search")}
               />
             </div>
 
             <div className="kx-sec-head">
-              ⚡ Aktive Produkte <span className="kx-sec-count">{activeCount}</span>
+              ⚡ {t(locale, "products.active")}{" "}
+              <span className="kx-sec-count">{activeCount}</span>
             </div>
             {activeCount === 0 ? (
-              <div className="kx-empty">
-                Keine lieferbereiten Produkte. Laden Sie Schlüssel oder Links hoch.
-              </div>
+              <div className="kx-empty">—</div>
             ) : (
               activeGroups.map(([cat, items]) => (
                 <div key={cat}>
                   <div className="kx-cat-head">
                     {cat}
-                    <span className="kx-sec-count">{items.length} Produkte</span>
+                    <span className="kx-sec-count">{items.length}</span>
                   </div>
                   <div className="kx-grid">
                     {items.map((r) => (
-                      <Card key={r.id} r={r} />
+                      <Card key={r.id} r={r} locale={locale} />
                     ))}
                   </div>
                 </div>
@@ -332,18 +334,18 @@ export default function Products() {
             {inactiveCount > 0 && (
               <>
                 <div className="kx-sec-head">
-                  📦 Noch nicht aktiviert{" "}
+                  📦 {t(locale, "products.notActivated")}{" "}
                   <span className="kx-sec-count">{inactiveCount}</span>
                 </div>
                 {inactiveGroups.map(([cat, items]) => (
                   <div key={cat}>
                     <div className="kx-cat-head">
                       {cat}
-                      <span className="kx-sec-count">{items.length} Produkte</span>
+                      <span className="kx-sec-count">{items.length}</span>
                     </div>
                     <div className="kx-grid">
                       {items.map((r) => (
-                        <Card key={r.id} r={r} />
+                        <Card key={r.id} r={r} locale={locale} />
                       ))}
                     </div>
                   </div>
