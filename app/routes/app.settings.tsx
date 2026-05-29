@@ -10,6 +10,7 @@ import { authenticate } from "../shopify.server";
 import { getSettings, updateSettings } from "../lib/settings.server";
 import { sendTestEmail } from "../lib/email.server";
 import { ensureOrdersCreateWebhook } from "../lib/webhooks.server";
+import { LOCALES, t } from "../lib/i18n";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin } = await authenticate.admin(request);
@@ -18,6 +19,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     await ensureOrdersCreateWebhook(admin);
   }
   return {
+    locale: s.adminLocale,
     settings: {
       shopName: s.shopName,
       brandColor: s.brandColor,
@@ -33,6 +35,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { admin } = await authenticate.admin(request);
+  const { adminLocale: locale } = await getSettings();
   const form = await request.formData();
   const intent = String(form.get("intent"));
 
@@ -41,7 +44,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     if (!/^#[0-9a-fA-F]{6}$/.test(brandColor)) {
       return data({
         ok: false,
-        message: "Markenfarbe muss ein Hex-Wert sein, z. B. #0b3d2e.",
+        message: t(locale, "settings.msgInvalidColor"),
       });
     }
     const deliverUnpaidOrders = form.get("deliverUnpaidOrders") === "true";
@@ -55,6 +58,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       emailIntro: String(form.get("emailIntro") ?? "").trim() || null,
       emailFooter: String(form.get("emailFooter") ?? "").trim() || null,
       defaultLocale: String(form.get("defaultLocale") ?? "de"),
+      adminLocale: String(form.get("adminLocale") || locale),
       deliverUnpaidOrders,
     });
 
@@ -63,32 +67,41 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     if (deliverUnpaidOrders) {
       await ensureOrdersCreateWebhook(admin);
     }
-    return data({ ok: true, message: "Einstellungen gespeichert." });
+    return data({ ok: true, message: t(locale, "settings.msgSaved") });
   }
 
   if (intent === "test") {
     const to = String(form.get("to") ?? "").trim();
-    const locale = String(form.get("locale") ?? "de");
+    const emailLocale = String(form.get("locale") ?? "de");
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) {
-      return data({ ok: false, message: "Bitte eine gültige E-Mail angeben." });
+      return data({ ok: false, message: t(locale, "settings.msgInvalidEmail") });
     }
     try {
-      await sendTestEmail({ to, locale });
-      return data({ ok: true, message: `Test-E-Mail an ${to} gesendet.` });
+      await sendTestEmail({ to, locale: emailLocale });
+      return data({
+        ok: true,
+        message: `${t(locale, "settings.testTo")} ${to} ${t(locale, "settings.msgTestSent")}`,
+      });
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       const hint = msg.includes("SMTP")
-        ? " Der E-Mail-Versand (SMTP) ist noch nicht konfiguriert."
+        ? " " + t(locale, "settings.msgSmtpHint")
         : "";
-      return data({ ok: false, message: `Versand fehlgeschlagen: ${msg}.${hint}` });
+      return data({
+        ok: false,
+        message: `${t(locale, "settings.msgSendFailed")} ${msg}.${hint}`,
+      });
     }
   }
 
-  return data({ ok: false, message: "Unbekannte Aktion." }, { status: 400 });
+  return data(
+    { ok: false, message: t(locale, "settings.msgUnknownAction") },
+    { status: 400 },
+  );
 };
 
 export default function Settings() {
-  const { settings } = useLoaderData<typeof loader>();
+  const { settings, locale } = useLoaderData<typeof loader>();
   const save = useFetcher<typeof action>();
   const test = useFetcher<typeof action>();
 
@@ -113,8 +126,8 @@ export default function Settings() {
   }, []);
 
   return (
-    <s-page heading="Einstellungen">
-      <s-section heading="Branding & E-Mail-Vorlage">
+    <s-page heading={t(locale, "settings.title")}>
+      <s-section heading={t(locale, "settings.brandingSection")}>
         {save.data?.message && (
           <s-banner tone={save.data.ok ? "success" : "critical"}>
             <s-paragraph>{save.data.message}</s-paragraph>
@@ -123,30 +136,41 @@ export default function Settings() {
         <save.Form method="post" ref={saveFormRef}>
           <input type="hidden" name="intent" value="settings" />
           <s-stack direction="block" gap="base">
+            <s-select
+              label={t(locale, "welcome.selectLang")}
+              name="adminLocale"
+              value={locale}
+            >
+              {LOCALES.map((l) => (
+                <s-option key={l.code} value={l.code}>
+                  {l.label}
+                </s-option>
+              ))}
+            </s-select>
             <s-text-field
-              label="Shop-Name"
+              label={t(locale, "settings.shopName")}
               name="shopName"
               value={settings.shopName}
             />
             <s-text-field
-              label="Markenfarbe (Hex)"
+              label={t(locale, "settings.brandColor")}
               name="brandColor"
               value={settings.brandColor}
               placeholder="#0b3d2e"
             />
             <s-text-field
-              label="Logo-URL (optional)"
+              label={t(locale, "settings.logoUrl")}
               name="logoUrl"
               value={settings.logoUrl}
               placeholder="https://…/logo.png"
             />
             <s-text-field
-              label="Support-E-Mail"
+              label={t(locale, "settings.supportEmail")}
               name="supportEmail"
               value={settings.supportEmail}
             />
             <s-select
-              label="Standardsprache der E-Mail"
+              label={t(locale, "settings.defaultLocale")}
               name="defaultLocale"
               value={settings.defaultLocale}
             >
@@ -154,43 +178,37 @@ export default function Settings() {
               <s-option value="en">English</s-option>
             </s-select>
             <s-select
-              label="Sofort-Auslieferung bei Vorkasse (vor Zahlungseingang)"
+              label={t(locale, "settings.instantPrepay")}
               name="deliverUnpaidOrders"
               value={settings.deliverUnpaidOrders ? "true" : "false"}
             >
-              <s-option value="false">Nein – erst nach Zahlungseingang</s-option>
-              <s-option value="true">Ja – sofort bei Bestellung</s-option>
+              <s-option value="false">{t(locale, "settings.instantNo")}</s-option>
+              <s-option value="true">{t(locale, "settings.instantYes")}</s-option>
             </s-select>
-            <s-text color="subdued">
-              Bei „Ja" erhält der Kunde Schlüssel/Download schon bei
-              Bestelleingang – auch bei noch nicht bezahlter Vorkasse.
-            </s-text>
+            <s-text color="subdued">{t(locale, "settings.instantHelper")}</s-text>
             <s-text-area
-              label="Eigener Einleitungstext (optional)"
+              label={t(locale, "settings.emailIntro")}
               name="emailIntro"
               rows={3}
               value={settings.emailIntro}
-              placeholder="Überschreibt den Standard-Einleitungstext der Liefermail."
+              placeholder={t(locale, "settings.emailIntroPlaceholder")}
             />
             <s-text-area
-              label="Eigener Fußzeilentext (optional)"
+              label={t(locale, "settings.emailFooter")}
               name="emailFooter"
               rows={2}
               value={settings.emailFooter}
-              placeholder="z. B. Kontakt- oder Rechtshinweise."
+              placeholder={t(locale, "settings.emailFooterPlaceholder")}
             />
             <s-button type="submit" variant="primary">
-              Speichern
+              {t(locale, "settings.save")}
             </s-button>
           </s-stack>
         </save.Form>
       </s-section>
 
-      <s-section heading="Test-Auslieferung">
-        <s-paragraph>
-          Senden Sie eine Beispiel-Liefermail an Ihre eigene Adresse, um die
-          Vorlage und den E-Mail-Versand zu prüfen.
-        </s-paragraph>
+      <s-section heading={t(locale, "settings.testSection")}>
+        <s-paragraph>{t(locale, "settings.testIntro")}</s-paragraph>
         {test.data?.message && (
           <s-banner tone={test.data.ok ? "success" : "critical"}>
             <s-paragraph>{test.data.message}</s-paragraph>
@@ -200,11 +218,15 @@ export default function Settings() {
           <input type="hidden" name="intent" value="test" />
           <s-stack direction="block" gap="base">
             <s-text-field
-              label="Test-E-Mail an"
+              label={t(locale, "settings.testTo")}
               name="to"
-              placeholder="ich@karinex.de"
+              placeholder={t(locale, "settings.testToPlaceholder")}
             />
-            <s-select label="Sprache" name="locale" value={settings.defaultLocale}>
+            <s-select
+              label={t(locale, "settings.language")}
+              name="locale"
+              value={settings.defaultLocale}
+            >
               <s-option value="de">Deutsch</s-option>
               <s-option value="en">English</s-option>
             </s-select>
@@ -212,7 +234,7 @@ export default function Settings() {
               type="submit"
               {...(test.state !== "idle" ? { loading: true } : {})}
             >
-              Test-E-Mail senden
+              {t(locale, "settings.sendTest")}
             </s-button>
           </s-stack>
         </test.Form>

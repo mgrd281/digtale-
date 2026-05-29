@@ -12,9 +12,12 @@ import prisma from "../db.server";
 import { uploadFile } from "../lib/storage.server";
 import { ensureOrdersCreateWebhook } from "../lib/webhooks.server";
 import { LOW_STOCK_THRESHOLD } from "../lib/shared";
+import { getSettings } from "../lib/settings.server";
+import { t } from "../lib/i18n";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
+  const settings = await getSettings();
 
   const product = await prisma.product.findUnique({
     where: { id: params.id },
@@ -42,6 +45,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   });
 
   return {
+    locale: settings.adminLocale,
     product: {
       id: product.id,
       title: product.title,
@@ -84,6 +88,7 @@ function parseKeys(raw: string): string[] {
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   const { admin } = await authenticate.admin(request);
   const productId = params.id as string;
+  const { adminLocale: locale } = await getSettings();
 
   const product = await prisma.product.findUnique({ where: { id: productId } });
   if (!product) {
@@ -114,17 +119,19 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     if (deliverUnpaid) {
       await ensureOrdersCreateWebhook(admin);
     }
-    return data({ ok: true, message: "Einstellungen gespeichert." });
+    return data({ ok: true, message: t(locale, "detail.msgSettingsSaved") });
   }
 
   if (intent === "addLink") {
-    const label = String(formData.get("label") ?? "").trim() || "Download + Anleitung";
+    const label =
+      String(formData.get("label") ?? "").trim() ||
+      t(locale, "detail.buttonTextPlaceholder");
     const version = String(formData.get("version") ?? "").trim();
     const url = String(formData.get("url") ?? "").trim();
     if (!/^https?:\/\//i.test(url)) {
       return data({
         ok: false,
-        message: "Bitte eine gültige URL angeben (beginnt mit https://).",
+        message: t(locale, "detail.msgInvalidUrl"),
       });
     }
     await prisma.productLink.create({
@@ -133,8 +140,8 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     return data({
       ok: true,
       message: version
-        ? `Version „${version}" hinzugefügt.`
-        : `Download-Link hinzugefügt.`,
+        ? `${t(locale, "detail.thVersion")} „${version}" ${t(locale, "detail.msgVersionAdded")}`
+        : t(locale, "detail.msgLinkAdded"),
     });
   }
 
@@ -142,7 +149,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     await prisma.productLink.delete({
       where: { id: String(formData.get("linkId")) },
     });
-    return data({ ok: true, message: "Download-Link entfernt." });
+    return data({ ok: true, message: t(locale, "detail.msgLinkRemoved") });
   }
 
   if (intent === "deleteKey") {
@@ -156,7 +163,10 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     });
     return data({
       ok: result.count > 0,
-      message: result.count > 0 ? "Schlüssel entfernt." : "Schlüssel nicht gefunden.",
+      message:
+        result.count > 0
+          ? t(locale, "detail.msgKeyRemoved")
+          : t(locale, "detail.msgKeyNotFound"),
     });
   }
 
@@ -169,7 +179,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     }
     const values = parseKeys(raw);
     if (values.length === 0) {
-      return data({ ok: false, message: "Keine gültigen Schlüssel gefunden." });
+      return data({ ok: false, message: t(locale, "detail.msgNoValidKeys") });
     }
     const result = await prisma.licenseKey.createMany({
       data: values.map((keyValue) => ({ productId, keyValue })),
@@ -177,16 +187,16 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     });
     return data({
       ok: true,
-      message: `${result.count} Schlüssel hinzugefügt (${
+      message: `${result.count} ${t(locale, "detail.msgKeysAdded")} (${
         values.length - result.count
-      } Duplikate übersprungen).`,
+      } ${t(locale, "detail.msgDuplicatesSkipped")}).`,
     });
   }
 
   if (intent === "uploadFile") {
     const file = formData.get("file");
     if (!(file instanceof File) || file.size === 0) {
-      return data({ ok: false, message: "Bitte wählen Sie eine Datei aus." });
+      return data({ ok: false, message: t(locale, "detail.msgSelectFile") });
     }
     try {
       const storageKey = `products/${productId}/${randomUUID()}-${file.name}`;
@@ -200,13 +210,19 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
           sizeBytes: BigInt(file.size),
         },
       });
-      return data({ ok: true, message: `Datei „${file.name}" hochgeladen.` });
+      return data({
+        ok: true,
+        message: `„${file.name}" ${t(locale, "detail.msgFileUploaded")}`,
+      });
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       const hint = /S3_|storage|bucket/i.test(msg)
-        ? " Der Datei-Speicher (S3/R2) ist noch nicht eingerichtet. Nutzen Sie stattdessen Download-Links – diese funktionieren für jede Dateigröße und jedes Format."
+        ? " " + t(locale, "detail.msgStorageHint")
         : "";
-      return data({ ok: false, message: `Upload fehlgeschlagen: ${msg}.${hint}` });
+      return data({
+        ok: false,
+        message: `${t(locale, "detail.msgUploadFailed")} ${msg}.${hint}`,
+      });
     }
   }
 
@@ -214,17 +230,27 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     await prisma.digitalFile.delete({
       where: { id: String(formData.get("fileId")) },
     });
-    return data({ ok: true, message: "Datei entfernt." });
+    return data({ ok: true, message: t(locale, "detail.msgFileRemoved") });
   }
 
-  return data({ ok: false, message: "Unbekannte Aktion." }, { status: 400 });
+  return data(
+    { ok: false, message: t(locale, "detail.msgUnknownAction") },
+    { status: 400 },
+  );
 };
 
-const DETAIL_DELIVERY_LABEL: Record<string, string> = {
-  KEY: "Lizenzschlüssel",
-  FILE: "Datei-Download",
-  BOTH: "Schlüssel + Datei",
-};
+function deliveryLabel(deliveryType: string, locale: string): string {
+  switch (deliveryType) {
+    case "KEY":
+      return t(locale, "detail.deliveryKey");
+    case "FILE":
+      return t(locale, "detail.deliveryFile");
+    case "BOTH":
+      return t(locale, "detail.deliveryBoth");
+    default:
+      return deliveryType;
+  }
+}
 
 const HERO_CSS = `
   .kx-hero {
@@ -247,7 +273,7 @@ const HERO_CSS = `
 `;
 
 export default function ProductDetail() {
-  const { product, available, assigned, keys: keyList, files, links } =
+  const { locale, product, available, assigned, keys: keyList, files, links } =
     useLoaderData<typeof loader>();
   const settings = useFetcher<typeof action>();
   const keys = useFetcher<typeof action>();
@@ -303,7 +329,7 @@ export default function ProductDetail() {
   return (
     <s-page heading={product.title}>
       <s-link slot="primary-action" href="/app/products">
-        Zurück
+        {t(locale, "detail.back")}
       </s-link>
 
       {product.imageUrl !== undefined && (
@@ -314,14 +340,14 @@ export default function ProductDetail() {
               {product.imageUrl ? (
                 <img src={product.imageUrl} alt={product.title} />
               ) : (
-                <span className="kx-hero-noimg">Kein Bild</span>
+                <span className="kx-hero-noimg">{t(locale, "detail.noImage")}</span>
               )}
             </div>
             <div className="kx-hero-info">
               <div className="kx-hero-title">{product.title}</div>
               <div className="kx-hero-badges">
                 <span className="kx-pill" style={{ background: "#eef2ff", color: "#3538cd" }}>
-                  {DETAIL_DELIVERY_LABEL[product.deliveryType] ?? product.deliveryType}
+                  {deliveryLabel(product.deliveryType, locale)}
                 </span>
                 {(product.deliveryType === "KEY" ||
                   product.deliveryType === "BOTH") && (
@@ -333,12 +359,12 @@ export default function ProductDetail() {
                         : { background: "#e7f7ec", color: "#1a7f37" }
                     }
                   >
-                    {available} Schlüssel verfügbar
+                    {available} {t(locale, "detail.keysAvailable")}
                   </span>
                 )}
                 {links.length > 0 && (
                   <span className="kx-pill" style={{ background: "#f1f5f9", color: "#334155" }}>
-                    {links.length} Download-Link(s)
+                    {links.length} {t(locale, "detail.downloadLinksCount")}
                   </span>
                 )}
               </div>
@@ -348,15 +374,14 @@ export default function ProductDetail() {
       )}
 
       {low && (
-        <s-banner tone="warning" heading="Niedriger Schlüsselbestand">
+        <s-banner tone="warning" heading={t(locale, "detail.lowStockHeading")}>
           <s-paragraph>
-            Nur noch {available} Schlüssel verfügbar. Bitte laden Sie neue
-            Schlüssel hoch.
+            {available} {t(locale, "detail.lowStockBody")}
           </s-paragraph>
         </s-banner>
       )}
 
-      <s-section heading="⚙️ Liefereinstellungen">
+      <s-section heading={`⚙️ ${t(locale, "detail.secDeliverySettings")}`}>
         {settings.data?.message && (
           <s-banner tone={settings.data.ok ? "success" : "critical"}>
             <s-paragraph>{settings.data.message}</s-paragraph>
@@ -366,61 +391,57 @@ export default function ProductDetail() {
           <input type="hidden" name="intent" value="settings" />
           <s-stack direction="block" gap="base">
             <s-select
-              label="Lieferart"
+              label={t(locale, "detail.deliveryType")}
               name="deliveryType"
               value={product.deliveryType}
             >
-              <s-option value="KEY">Nur Lizenzschlüssel</s-option>
-              <s-option value="FILE">Nur Datei-Download</s-option>
-              <s-option value="BOTH">Schlüssel und Datei</s-option>
+              <s-option value="KEY">{t(locale, "detail.optKeyOnly")}</s-option>
+              <s-option value="FILE">{t(locale, "detail.optFileOnly")}</s-option>
+              <s-option value="BOTH">{t(locale, "detail.optKeyAndFile")}</s-option>
             </s-select>
             <s-number-field
-              label="Maximale Downloads pro Link"
+              label={t(locale, "detail.maxDownloads")}
               name="downloadLimit"
               value={String(product.downloadLimit)}
               min={1}
             />
             <s-number-field
-              label="Gültigkeit des Links (Stunden)"
+              label={t(locale, "detail.linkValidity")}
               name="linkExpiryHours"
               value={String(product.linkExpiryHours)}
               min={1}
             />
             <s-select
-              label="Sofort-Auslieferung bei Vorkasse (vor Zahlung)"
+              label={t(locale, "detail.instantPrepay")}
               name="deliverUnpaid"
               value={product.deliverUnpaid ? "true" : "false"}
             >
-              <s-option value="false">Nein – erst nach Zahlungseingang</s-option>
-              <s-option value="true">Ja – sofort bei Bestellung</s-option>
+              <s-option value="false">{t(locale, "detail.instantNo")}</s-option>
+              <s-option value="true">{t(locale, "detail.instantYes")}</s-option>
             </s-select>
             <s-text-area
-              label="Nachricht an den Kunden (optional)"
+              label={t(locale, "detail.deliveryMessage")}
               name="deliveryMessage"
               rows={4}
               value={product.deliveryMessage}
-              placeholder="z. B. Installationsanleitung oder Hinweise zur Aktivierung."
+              placeholder={t(locale, "detail.deliveryMessagePlaceholder")}
             />
             <s-stack direction="inline" gap="small">
               <s-button type="submit" variant="primary">
-                Speichern
+                {t(locale, "detail.save")}
               </s-button>
               <s-text color="subdued">
                 {settings.state !== "idle"
-                  ? "Wird gespeichert …"
-                  : "Änderungen werden automatisch gespeichert"}
+                  ? t(locale, "detail.saving")
+                  : t(locale, "detail.autoSaved")}
               </s-text>
             </s-stack>
           </s-stack>
         </settings.Form>
       </s-section>
 
-      <s-section heading="🔗 Download-Links">
-        <s-paragraph>
-          Links, die dem Kunden nach dem Kauf angezeigt werden (z. B. Installer
-          oder Anleitung). Es wird kein Datei-Upload benötigt – fügen Sie einfach
-          die URL ein.
-        </s-paragraph>
+      <s-section heading={`🔗 ${t(locale, "detail.secDownloadLinks")}`}>
+        <s-paragraph>{t(locale, "detail.linksIntro")}</s-paragraph>
         {linkFetcher.data?.message && (
           <s-banner tone={linkFetcher.data.ok ? "success" : "critical"}>
             <s-paragraph>{linkFetcher.data.message}</s-paragraph>
@@ -430,18 +451,22 @@ export default function ProductDetail() {
           <input type="hidden" name="intent" value="addLink" />
           <s-stack direction="block" gap="base">
             <s-text-field
-              label="Versionsname"
+              label={t(locale, "detail.versionName")}
               name="version"
-              placeholder="z. B. Windows · 64-Bit · Deutsch"
+              placeholder={t(locale, "detail.versionNamePlaceholder")}
             />
             <s-text-field
-              label="Button-Text"
+              label={t(locale, "detail.buttonText")}
               name="label"
-              placeholder="Download + Anleitung"
+              placeholder={t(locale, "detail.buttonTextPlaceholder")}
             />
-            <s-text-field label="URL" name="url" placeholder="https://…" />
+            <s-text-field
+              label="URL"
+              name="url"
+              placeholder={t(locale, "detail.urlPlaceholder")}
+            />
             <s-button type="submit" variant="primary">
-              Link hinzufügen
+              {t(locale, "detail.addLink")}
             </s-button>
           </s-stack>
         </linkFetcher.Form>
@@ -449,19 +474,19 @@ export default function ProductDetail() {
         {links.length > 0 && (
           <s-table>
             <s-table-header-row>
-              <s-table-header>Version</s-table-header>
-              <s-table-header>Button-Text</s-table-header>
-              <s-table-header>Link</s-table-header>
+              <s-table-header>{t(locale, "detail.thVersion")}</s-table-header>
+              <s-table-header>{t(locale, "detail.thButtonText")}</s-table-header>
+              <s-table-header>{t(locale, "detail.thLink")}</s-table-header>
               <s-table-header></s-table-header>
             </s-table-header-row>
             <s-table-body>
               {links.map((l) => (
                 <s-table-row key={l.id}>
-                  <s-table-cell>{l.version || "—"}</s-table-cell>
+                  <s-table-cell>{l.version || t(locale, "detail.dash")}</s-table-cell>
                   <s-table-cell>{l.label}</s-table-cell>
                   <s-table-cell>
                     <s-link href={l.url} target="_blank">
-                      Öffnen
+                      {t(locale, "detail.open")}
                     </s-link>
                   </s-table-cell>
                   <s-table-cell>
@@ -469,7 +494,7 @@ export default function ProductDetail() {
                       <input type="hidden" name="intent" value="deleteLink" />
                       <input type="hidden" name="linkId" value={l.id} />
                       <s-button type="submit" variant="tertiary" tone="critical">
-                        Entfernen
+                        {t(locale, "detail.remove")}
                       </s-button>
                     </linkFetcher.Form>
                   </s-table-cell>
@@ -480,12 +505,14 @@ export default function ProductDetail() {
         )}
       </s-section>
 
-      <s-section heading="🔑 Schlüssel">
+      <s-section heading={`🔑 ${t(locale, "detail.secKeys")}`}>
         <s-stack direction="inline" gap="large">
           <s-badge tone={low ? "warning" : "success"}>
-            Verfügbar: {String(available)}
+            {t(locale, "detail.available")} {String(available)}
           </s-badge>
-          <s-badge>Zugewiesen: {String(assigned)}</s-badge>
+          <s-badge>
+            {t(locale, "detail.assigned")} {String(assigned)}
+          </s-badge>
         </s-stack>
         {keys.data?.message && (
           <s-banner tone={keys.data.ok ? "success" : "critical"}>
@@ -496,15 +523,15 @@ export default function ProductDetail() {
           <input type="hidden" name="intent" value="keys" />
           <s-stack direction="block" gap="base">
             <s-text-area
-              label="Schlüssel einfügen (einer pro Zeile)"
+              label={t(locale, "detail.keysTextareaLabel")}
               name="keys"
               rows={6}
               placeholder="ABCD-1234-EFGH-5678"
             />
-            <s-text>oder CSV-Datei hochladen:</s-text>
+            <s-text>{t(locale, "detail.orCsv")}</s-text>
             <input type="file" name="keysCsv" accept=".csv,text/csv" />
             <s-button type="submit" variant="primary">
-              Schlüssel hinzufügen
+              {t(locale, "detail.addKeys")}
             </s-button>
           </s-stack>
         </keys.Form>
@@ -512,7 +539,7 @@ export default function ProductDetail() {
         {keyList.length > 0 && (
           <s-table>
             <s-table-header-row>
-              <s-table-header>Verfügbare Schlüssel</s-table-header>
+              <s-table-header>{t(locale, "detail.availableKeys")}</s-table-header>
               <s-table-header></s-table-header>
             </s-table-header-row>
             <s-table-body>
@@ -526,7 +553,7 @@ export default function ProductDetail() {
                       <input type="hidden" name="intent" value="deleteKey" />
                       <input type="hidden" name="keyId" value={k.id} />
                       <s-button type="submit" variant="tertiary" tone="critical">
-                        Entfernen
+                        {t(locale, "detail.remove")}
                       </s-button>
                     </keys.Form>
                   </s-table-cell>
@@ -537,7 +564,7 @@ export default function ProductDetail() {
         )}
       </s-section>
 
-      <s-section heading="📁 Dateien">
+      <s-section heading={`📁 ${t(locale, "detail.secFiles")}`}>
         {upload.data?.message && (
           <s-banner tone={upload.data.ok ? "success" : "critical"}>
             <s-paragraph>{upload.data.message}</s-paragraph>
@@ -582,16 +609,18 @@ export default function ProductDetail() {
             >
               <div className="kx-drop-ic">⬆</div>
               <div className="kx-drop-t">
-                {uploadName || "Datei hierher ziehen oder klicken"}
+                {uploadName || t(locale, "detail.dropZone")}
               </div>
-              <div className="kx-drop-s">Alle Formate · z. B. .pkg .zip .exe .dmg .iso</div>
+              <div className="kx-drop-s">{t(locale, "detail.dropZoneHint")}</div>
             </div>
             <s-button
               type="submit"
               variant="primary"
               {...(upload.state !== "idle" ? { loading: true } : {})}
             >
-              {upload.state !== "idle" ? "Wird hochgeladen …" : "Datei hochladen"}
+              {upload.state !== "idle"
+                ? t(locale, "detail.uploading")
+                : t(locale, "detail.uploadFile")}
             </s-button>
           </s-stack>
         </upload.Form>
@@ -599,8 +628,8 @@ export default function ProductDetail() {
         {files.length > 0 && (
           <s-table>
             <s-table-header-row>
-              <s-table-header>Dateiname</s-table-header>
-              <s-table-header>Größe</s-table-header>
+              <s-table-header>{t(locale, "detail.thFileName")}</s-table-header>
+              <s-table-header>{t(locale, "detail.thSize")}</s-table-header>
               <s-table-header></s-table-header>
             </s-table-header-row>
             <s-table-body>
@@ -615,7 +644,7 @@ export default function ProductDetail() {
                       <input type="hidden" name="intent" value="deleteFile" />
                       <input type="hidden" name="fileId" value={f.id} />
                       <s-button type="submit" variant="tertiary" tone="critical">
-                        Entfernen
+                        {t(locale, "detail.remove")}
                       </s-button>
                     </upload.Form>
                   </s-table-cell>
@@ -626,12 +655,8 @@ export default function ProductDetail() {
         )}
       </s-section>
 
-      <s-section heading="👁️ Vorschau – so sieht es der Kunde">
-        <s-paragraph>
-          So erscheint die Auslieferung auf der Dankesseite des Kunden. Der
-          Lizenzschlüssel ist ein Beispiel – der echte Schlüssel wird beim Kauf
-          automatisch zugewiesen.
-        </s-paragraph>
+      <s-section heading={`👁️ ${t(locale, "detail.secPreview")}`}>
+        <s-paragraph>{t(locale, "detail.previewIntro")}</s-paragraph>
         <div
           style={{
             background: "linear-gradient(135deg, #eef2f6, #f8fafc)",
@@ -680,7 +705,7 @@ export default function ProductDetail() {
             product.deliveryType === "BOTH") && (
             <div style={{ margin: "14px 0" }}>
               <div style={{ fontSize: "12px", color: "#777" }}>
-                Ihr Lizenzschlüssel:
+                {t(locale, "detail.yourLicenseKey")}
               </div>
               <div
                 style={{
@@ -757,8 +782,7 @@ export default function ProductDetail() {
             files.length === 0 &&
             product.deliveryType === "FILE" && (
               <div style={{ fontSize: "13px", color: "#b00", marginTop: "8px" }}>
-                Noch keine Download-Links oder Dateien – der Kunde sieht keinen
-                Download-Button.
+                {t(locale, "detail.previewEmptyWarning")}
               </div>
             )}
           </div>

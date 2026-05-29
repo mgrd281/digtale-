@@ -5,9 +5,12 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { env } from "../lib/env.server";
 import { generateDownloadToken } from "../lib/tokens.server";
+import { getSettings } from "../lib/settings.server";
+import { t } from "../lib/i18n";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
+  const settings = await getSettings();
 
   let delivery = await prisma.delivery.findUnique({
     where: { id: params.id },
@@ -44,15 +47,16 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       url: l.url,
     })),
     ...delivery.tokens
-      .filter((t) => !t.revoked)
-      .map((t) => ({
-        name: t.file.fileName,
+      .filter((tok) => !tok.revoked)
+      .map((tok) => ({
+        name: tok.file.fileName,
         label: "Download",
-        url: `${env.appUrl}/download/${t.token}`,
+        url: `${env.appUrl}/download/${tok.token}`,
       })),
   ];
 
   return {
+    locale: settings.adminLocale,
     orderName: delivery.shopifyOrderName,
     email: delivery.customerEmail,
     status: delivery.status,
@@ -68,12 +72,12 @@ export default function DeliveryCustomerView() {
   const d = useLoaderData<typeof loader>();
 
   return (
-    <s-page heading={`Lieferung ${d.orderName}`}>
+    <s-page heading={`${t(d.locale, "delivery.heading")} ${d.orderName}`}>
       <s-link slot="primary-action" href="/app/deliveries">
-        Zurück
+        {t(d.locale, "delivery.back")}
       </s-link>
 
-      <s-section heading="Bestellung">
+      <s-section heading={t(d.locale, "delivery.orderSection")}>
         <s-stack direction="inline" gap="large">
           <s-badge>{d.email}</s-badge>
           <s-badge
@@ -90,11 +94,8 @@ export default function DeliveryCustomerView() {
         </s-stack>
       </s-section>
 
-      <s-section heading="Öffentlicher Link (wie der Kunde ihn sieht)">
-        <s-paragraph>
-          Dieser Link öffnet die Lieferseite direkt – ohne Login. Zum Ansehen
-          oder erneuten Teilen mit dem Kunden.
-        </s-paragraph>
+      <s-section heading={t(d.locale, "delivery.publicLinkSection")}>
+        <s-paragraph>{t(d.locale, "delivery.publicLinkIntro")}</s-paragraph>
         <div
           style={{
             display: "flex",
@@ -119,16 +120,13 @@ export default function DeliveryCustomerView() {
             }}
           />
           <s-link href={d.publicUrl} target="_blank">
-            Öffnen
+            {t(d.locale, "delivery.open")}
           </s-link>
         </div>
       </s-section>
 
-      <s-section heading="Kundenansicht – Dankesseite">
-        <s-paragraph>
-          Genau das hat der Kunde nach dem Kauf gesehen (echter Schlüssel und
-          echte Download-Links dieser Bestellung).
-        </s-paragraph>
+      <s-section heading={t(d.locale, "delivery.customerViewSection")}>
+        <s-paragraph>{t(d.locale, "delivery.customerViewIntro")}</s-paragraph>
         <div
           style={{
             maxWidth: "520px",
@@ -166,7 +164,7 @@ export default function DeliveryCustomerView() {
           {d.licenseKey && (
             <div style={{ margin: "14px 0" }}>
               <div style={{ fontSize: "12px", color: "#777" }}>
-                Ihr Lizenzschlüssel:
+                {t(d.locale, "delivery.yourLicenseKey")}
               </div>
               <div
                 style={{
@@ -219,8 +217,7 @@ export default function DeliveryCustomerView() {
 
           {!d.licenseKey && d.downloads.length === 0 && (
             <div style={{ fontSize: "13px", color: "#b00", marginTop: "8px" }}>
-              Für diese Lieferung sind kein Schlüssel und keine Downloads
-              vorhanden.
+              {t(d.locale, "delivery.noContentWarning")}
             </div>
           )}
         </div>
