@@ -18,6 +18,7 @@ function getTransporter(): Transporter {
 
 export interface DeliveryEmailItem {
   productTitle: string;
+  message?: string | null;
   licenseKey?: string | null;
   downloads: { fileName: string; url: string }[];
   linkExpiryHours: number;
@@ -29,6 +30,11 @@ const escape = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 function renderItem(item: DeliveryEmailItem): string {
+  const message = item.message
+    ? `<p style="margin:12px 0 0;font-size:14px;line-height:1.6;color:#444;
+         white-space:pre-line;">${escape(item.message)}</p>`
+    : "";
+
   const key = item.licenseKey
     ? `<p style="margin:16px 0 4px;font-size:14px;color:#555;">${de.keyLabel}</p>
        <p style="margin:0;font-family:monospace;font-size:18px;font-weight:700;
@@ -57,6 +63,7 @@ function renderItem(item: DeliveryEmailItem): string {
   return `
     <div style="border:1px solid #e0e4e2;border-radius:10px;padding:24px;margin:0 0 20px;">
       <h2 style="margin:0 0 4px;font-size:18px;color:${BRAND};">${escape(item.productTitle)}</h2>
+      ${message}
       ${key}
       ${buttons ? `<table role="presentation" style="margin-top:16px;">${buttons}</table>` : ""}
       ${validity}
@@ -81,6 +88,9 @@ function renderText(orderName: string, items: DeliveryEmailItem[]): string {
   const lines = [de.emailGreeting, "", de.emailIntro, ""];
   for (const item of items) {
     lines.push(`== ${item.productTitle} ==`);
+    if (item.message) {
+      lines.push(item.message);
+    }
     if (item.licenseKey) {
       lines.push(`${de.keyLabel} ${item.licenseKey}`);
     }

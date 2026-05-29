@@ -31,7 +31,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const deliveries = await prisma.delivery.findMany({
     where: { shopifyOrderId: orderId },
     include: {
-      product: { select: { title: true } },
+      product: {
+        select: {
+          title: true,
+          deliveryMessage: true,
+          links: { orderBy: { createdAt: "asc" } },
+        },
+      },
       licenseKey: { select: { keyValue: true } },
       tokens: {
         where: { revoked: false },
@@ -41,17 +47,27 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   });
 
   const now = Date.now();
-  const items = deliveries.map((d) => ({
-    productTitle: d.product.title,
-    licenseKey: d.status === "DELIVERED" ? (d.licenseKey?.keyValue ?? null) : null,
-    status: d.status,
-    downloads: d.tokens
+  const items = deliveries.map((d) => {
+    const delivered = d.status === "DELIVERED";
+    // Static per-product links (no storage needed) shown first, then any
+    // storage-backed file downloads with a live token.
+    const linkDownloads = delivered
+      ? d.product.links.map((l) => ({ fileName: l.label, url: l.url }))
+      : [];
+    const fileDownloads = d.tokens
       .filter((t) => t.expiresAt.getTime() > now && t.downloadCount < t.maxDownloads)
       .map((t) => ({
         fileName: t.file.fileName,
         url: `${env.appUrl}/download/${t.token}`,
-      })),
-  }));
+      }));
+    return {
+      productTitle: d.product.title,
+      message: delivered ? (d.product.deliveryMessage ?? null) : null,
+      licenseKey: delivered ? (d.licenseKey?.keyValue ?? null) : null,
+      status: d.status,
+      downloads: [...linkDownloads, ...fileDownloads],
+    };
+  });
 
   // "Pending" when an order we manage has no delivered line yet (still
   // processing right after payment).

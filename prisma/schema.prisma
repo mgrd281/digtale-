@@ -58,11 +58,30 @@ model Product {
   deliveryType     DeliveryType @default(KEY)
   downloadLimit    Int          @default(3)
   linkExpiryHours  Int          @default(72)
+  // Optional per-product instructions shown to the customer (and e-mailed)
+  // alongside the key/downloads, e.g. installation notes ("Anleitung").
+  deliveryMessage  String?
   createdAt        DateTime     @default(now())
 
   licenseKeys LicenseKey[]
   files       DigitalFile[]
+  links       ProductLink[]
   deliveries  Delivery[]
+}
+
+// Static download links shown to every customer who buys the product
+// (e.g. a hosted installer / instructions URL). Unlike DigitalFile these
+// require no object storage – the merchant just pastes a URL.
+model ProductLink {
+  id        String   @id @default(cuid())
+  productId String
+  label     String
+  url       String
+  createdAt DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
 }
 
 model LicenseKey {

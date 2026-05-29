@@ -85,6 +85,8 @@ function DeliveryBlock() {
           <BlockStack spacing="base">
             <Heading level={3}>{item.productTitle}</Heading>
 
+            {item.message && <Text>{item.message}</Text>}
+
             {item.licenseKey && (
               <View border="base" cornerRadius="base" padding="base">
                 <BlockStack spacing="extraTight">
