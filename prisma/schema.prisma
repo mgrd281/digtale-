@@ -61,6 +61,9 @@ model AppSettings {
   emailIntro    String?
   emailFooter   String?
   defaultLocale String   @default("de")
+  // Admin UI language (chosen on first run) + whether onboarding is done.
+  adminLocale   String   @default("de")
+  onboarded     Boolean  @default(false)
   // Deliver immediately when an order is *created* (e.g. Vorkasse / bank
   // transfer, before payment is confirmed) instead of only on payment.
   deliverUnpaidOrders Boolean @default(false)

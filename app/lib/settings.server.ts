@@ -22,6 +22,8 @@ export async function updateSettings(
       | "emailIntro"
       | "emailFooter"
       | "defaultLocale"
+      | "adminLocale"
+      | "onboarded"
       | "deliverUnpaidOrders"
     >
   >,
