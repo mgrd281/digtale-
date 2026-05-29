@@ -18,6 +18,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     where: { id: params.id },
     include: {
       files: { orderBy: { createdAt: "desc" } },
+      links: { orderBy: { createdAt: "asc" } },
       _count: { select: { licenseKeys: true } },
     },
   });
@@ -39,6 +40,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       deliveryType: product.deliveryType,
       downloadLimit: product.downloadLimit,
       linkExpiryHours: product.linkExpiryHours,
+      deliveryMessage: product.deliveryMessage ?? "",
     },
     available,
     assigned,
@@ -46,6 +48,11 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       id: f.id,
       fileName: f.fileName,
       sizeBytes: Number(f.sizeBytes),
+    })),
+    links: product.links.map((l) => ({
+      id: l.id,
+      label: l.label,
+      url: l.url,
     })),
   };
 };
@@ -87,9 +94,33 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
           1,
           Number(formData.get("linkExpiryHours")) || 1,
         ),
+        deliveryMessage: String(formData.get("deliveryMessage") ?? "").trim() || null,
       },
     });
     return data({ ok: true, message: "Einstellungen gespeichert." });
+  }
+
+  if (intent === "addLink") {
+    const label = String(formData.get("label") ?? "").trim();
+    const url = String(formData.get("url") ?? "").trim();
+    if (!label || !url) {
+      return data({ ok: false, message: "Bitte Bezeichnung und URL angeben." });
+    }
+    if (!/^https?:\/\//i.test(url)) {
+      return data({
+        ok: false,
+        message: "Die URL muss mit http:// oder https:// beginnen.",
+      });
+    }
+    await prisma.productLink.create({ data: { productId, label, url } });
+    return data({ ok: true, message: `Download-Link „${label}“ hinzugefügt.` });
+  }
+
+  if (intent === "deleteLink") {
+    await prisma.productLink.delete({
+      where: { id: String(formData.get("linkId")) },
+    });
+    return data({ ok: true, message: "Download-Link entfernt." });
   }
 
   if (intent === "keys") {
@@ -145,10 +176,12 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 };
 
 export default function ProductDetail() {
-  const { product, available, assigned, files } = useLoaderData<typeof loader>();
+  const { product, available, assigned, files, links } =
+    useLoaderData<typeof loader>();
   const settings = useFetcher<typeof action>();
   const keys = useFetcher<typeof action>();
   const upload = useFetcher<typeof action>();
+  const linkFetcher = useFetcher<typeof action>();
 
   const low =
     (product.deliveryType === "KEY" || product.deliveryType === "BOTH") &&
@@ -199,11 +232,76 @@ export default function ProductDetail() {
               value={String(product.linkExpiryHours)}
               min={1}
             />
+            <s-text-area
+              label="Nachricht an den Kunden (optional)"
+              name="deliveryMessage"
+              rows={4}
+              value={product.deliveryMessage}
+              placeholder="z. B. Installationsanleitung oder Hinweise zur Aktivierung."
+            />
             <s-button type="submit" variant="primary">
               Speichern
             </s-button>
           </s-stack>
         </settings.Form>
+      </s-section>
+
+      <s-section heading="Download-Links">
+        <s-paragraph>
+          Links, die dem Kunden nach dem Kauf angezeigt werden (z. B. Installer
+          oder Anleitung). Es wird kein Datei-Upload benötigt – fügen Sie einfach
+          die URL ein.
+        </s-paragraph>
+        {linkFetcher.data?.message && (
+          <s-banner tone={linkFetcher.data.ok ? "success" : "critical"}>
+            <s-paragraph>{linkFetcher.data.message}</s-paragraph>
+          </s-banner>
+        )}
+        <linkFetcher.Form method="post">
+          <input type="hidden" name="intent" value="addLink" />
+          <s-stack direction="block" gap="base">
+            <s-text-field
+              label="Bezeichnung"
+              name="label"
+              placeholder="Download + Anleitung"
+            />
+            <s-text-field
+              label="URL"
+              name="url"
+              placeholder="https://…"
+            />
+            <s-button type="submit" variant="primary">
+              Link hinzufügen
+            </s-button>
+          </s-stack>
+        </linkFetcher.Form>
+
+        {links.length > 0 && (
+          <s-table>
+            <s-table-header-row>
+              <s-table-header>Bezeichnung</s-table-header>
+              <s-table-header>URL</s-table-header>
+              <s-table-header></s-table-header>
+            </s-table-header-row>
+            <s-table-body>
+              {links.map((l) => (
+                <s-table-row key={l.id}>
+                  <s-table-cell>{l.label}</s-table-cell>
+                  <s-table-cell>{l.url}</s-table-cell>
+                  <s-table-cell>
+                    <linkFetcher.Form method="post">
+                      <input type="hidden" name="intent" value="deleteLink" />
+                      <input type="hidden" name="linkId" value={l.id} />
+                      <s-button type="submit" variant="tertiary" tone="critical">
+                        Entfernen
+                      </s-button>
+                    </linkFetcher.Form>
+                  </s-table-cell>
+                </s-table-row>
+              ))}
+            </s-table-body>
+          </s-table>
+        )}
       </s-section>
 
       <s-section heading="Schlüssel hochladen">

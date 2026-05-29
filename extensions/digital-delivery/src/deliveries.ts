@@ -7,6 +7,7 @@ export interface DeliveryDownload {
 
 export interface DeliveryItem {
   productTitle: string;
+  message: string | null;
   licenseKey: string | null;
   status: "PENDING" | "DELIVERED" | "FAILED";
   downloads: DeliveryDownload[];
