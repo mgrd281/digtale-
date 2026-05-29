@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   reactExtension,
   useApi,
+  View,
   BlockStack,
   InlineStack,
   Heading,
@@ -9,7 +10,6 @@ import {
   Button,
   Banner,
   Spinner,
-  Divider,
 } from "@shopify/ui-extensions-react/checkout";
 import { fetchDeliveries, type DeliveriesResponse } from "./deliveries";
 
@@ -24,11 +24,28 @@ function DeliveryBlock() {
 
   useEffect(() => {
     let active = true;
-    fetchDeliveries(api, "checkout")
-      .then((res) => active && setData(res))
-      .catch(() => active && setErrored(true));
+    // Poll a few times: the orders/paid webhook may land a moment after the
+    // Thank-you page first renders, so the first fetch can still be "pending".
+    let attempts = 0;
+    let timer: ReturnType<typeof setTimeout>;
+
+    const tick = () => {
+      fetchDeliveries(api, "checkout")
+        .then((res) => {
+          if (!active) return;
+          setData(res);
+          if (res.pending && attempts < 5) {
+            attempts += 1;
+            timer = setTimeout(tick, 2500);
+          }
+        })
+        .catch(() => active && setErrored(true));
+    };
+    tick();
+
     return () => {
       active = false;
+      clearTimeout(timer);
     };
   }, [api]);
 
@@ -64,29 +81,41 @@ function DeliveryBlock() {
     <BlockStack spacing="loose">
       <Heading level={2}>{data.heading}</Heading>
       {data.items.map((item, i) => (
-        <BlockStack key={i} spacing="tight">
-          <Text emphasis="bold">{item.productTitle}</Text>
-          {item.licenseKey && (
-            <BlockStack spacing="extraTight">
-              <Text appearance="subdued" size="small">
-                {data.keyLabel}
-              </Text>
-              <Text emphasis="bold">{item.licenseKey}</Text>
-            </BlockStack>
-          )}
-          {item.downloads.map((d, j) => (
-            <Button key={j} to={d.url} kind="primary">
-              {data.downloadButton}
-            </Button>
-          ))}
-          {item.downloads.length > 0 && (
-            <Text appearance="subdued" size="small">
-              {data.legal}
-            </Text>
-          )}
-        </BlockStack>
+        <View key={i} border="base" cornerRadius="large" padding="base">
+          <BlockStack spacing="base">
+            <Heading level={3}>{item.productTitle}</Heading>
+
+            {item.licenseKey && (
+              <View border="base" cornerRadius="base" padding="base">
+                <BlockStack spacing="extraTight">
+                  <Text appearance="subdued" size="small">
+                    {data.keyLabel}
+                  </Text>
+                  <Text emphasis="bold" size="large">
+                    {item.licenseKey}
+                  </Text>
+                </BlockStack>
+              </View>
+            )}
+
+            {item.downloads.length > 0 && (
+              <BlockStack spacing="tight">
+                {item.downloads.map((d, j) => (
+                  <BlockStack key={j} spacing="extraTight">
+                    <Text size="small">{d.fileName}</Text>
+                    <Button to={d.url} kind="primary">
+                      {data.downloadButton}
+                    </Button>
+                  </BlockStack>
+                ))}
+                <Text appearance="subdued" size="small">
+                  {data.legal}
+                </Text>
+              </BlockStack>
+            )}
+          </BlockStack>
+        </View>
       ))}
-      <Divider />
     </BlockStack>
   );
 }
