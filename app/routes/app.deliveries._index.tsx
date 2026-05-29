@@ -73,6 +73,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       await revokeDelivery(deliveryId);
       return { ok: true, message: "Lieferung widerrufen." };
     }
+    if (intent === "delete") {
+      // Remove the record (download tokens cascade). The assigned key stays
+      // burned so it is never reissued.
+      await prisma.delivery.delete({ where: { id: deliveryId } });
+      return { ok: true, message: "Eintrag gelöscht." };
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return { ok: false, message };
@@ -163,6 +169,13 @@ export default function Deliveries() {
                         <input type="hidden" name="deliveryId" value={d.id} />
                         <s-button type="submit" variant="tertiary" tone="critical">
                           Widerrufen
+                        </s-button>
+                      </action.Form>
+                      <action.Form method="post">
+                        <input type="hidden" name="intent" value="delete" />
+                        <input type="hidden" name="deliveryId" value={d.id} />
+                        <s-button type="submit" variant="tertiary" tone="critical">
+                          Löschen
                         </s-button>
                       </action.Form>
                     </s-stack>

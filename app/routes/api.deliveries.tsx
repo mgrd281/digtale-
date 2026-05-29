@@ -48,35 +48,42 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   });
 
   const now = Date.now();
-  const items = deliveries.map((d) => {
-    const delivered = d.status === "DELIVERED";
-    // Static per-product links (no storage needed) shown first, then any
-    // storage-backed file downloads with a live token.
-    const linkDownloads = delivered
-      ? d.product.links.map((l) => ({ fileName: l.version || l.label, url: l.url }))
-      : [];
-    const fileDownloads = d.tokens
-      .filter((tok) => tok.expiresAt.getTime() > now && tok.downloadCount < tok.maxDownloads)
-      .map((tok) => ({
-        fileName: tok.file.fileName,
-        url: `${env.appUrl}/download/${tok.token}`,
+  // Only show products that are actually delivered (set up + provisioned).
+  const items = deliveries
+    .filter((d) => d.status === "DELIVERED")
+    .map((d) => {
+      const linkDownloads = d.product.links.map((l) => ({
+        fileName: l.version || l.label,
+        url: l.url,
       }));
-    return {
-      productTitle: d.product.title,
-      message: delivered ? (d.product.deliveryMessage ?? null) : null,
-      licenseKey: delivered ? (d.licenseKey?.keyValue ?? null) : null,
-      status: d.status,
-      downloads: [...linkDownloads, ...fileDownloads],
-    };
-  });
+      const fileDownloads = d.tokens
+        .filter(
+          (tok) =>
+            tok.expiresAt.getTime() > now && tok.downloadCount < tok.maxDownloads,
+        )
+        .map((tok) => ({
+          fileName: tok.file.fileName,
+          url: `${env.appUrl}/download/${tok.token}`,
+        }));
+      return {
+        productTitle: d.product.title,
+        message: d.product.deliveryMessage ?? null,
+        licenseKey: d.licenseKey?.keyValue ?? null,
+        status: d.status,
+        downloads: [...linkDownloads, ...fileDownloads],
+      };
+    });
 
-  // "Pending" when an order we manage has no delivered line yet (still
-  // processing right after payment).
-  const pending =
-    deliveries.length === 0 || deliveries.every((d) => d.status === "PENDING");
+  const anyPending = deliveries.some((d) => d.status === "PENDING");
+  // pending: something is still processing right after payment.
+  const pending = items.length === 0 && anyPending;
+  // hide: this order has nothing we deliver (unconfigured product / not ours) –
+  // the customer block then renders nothing at all.
+  const hide = items.length === 0 && !anyPending;
 
   return cors(
     Response.json({
+      hide,
       pending,
       heading: t.heading,
       keyLabel: t.keyLabel,

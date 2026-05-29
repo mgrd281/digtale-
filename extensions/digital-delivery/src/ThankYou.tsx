@@ -69,6 +69,11 @@ function DeliveryBlock() {
     );
   }
 
+  // Nothing to deliver for this order (product not set up) → show nothing.
+  if (data.hide) {
+    return null;
+  }
+
   if (data.pending || data.items.length === 0) {
     return (
       <Banner status="info" title={data.heading}>
