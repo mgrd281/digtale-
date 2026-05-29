@@ -21,7 +21,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     },
   });
   if (!delivery) {
-    throw new Response("Lieferung nicht gefunden", { status: 404 });
+    throw new Response(t(settings.adminLocale, "common.notFound"), { status: 404 });
   }
 
   // Backfill the public share token for older deliveries.

@@ -28,7 +28,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     },
   });
   if (!product) {
-    throw new Response("Produkt nicht gefunden", { status: 404 });
+    throw new Response(t(settings.adminLocale, "common.notFound"), { status: 404 });
   }
 
   const available = await prisma.licenseKey.count({
@@ -92,7 +92,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
   const product = await prisma.product.findUnique({ where: { id: productId } });
   if (!product) {
-    throw new Response("Produkt nicht gefunden", { status: 404 });
+    throw new Response(t(locale, "common.notFound"), { status: 404 });
   }
 
   const formData = await request.formData();

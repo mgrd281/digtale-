@@ -201,7 +201,8 @@ export type TKey =
   | "settings.msgTestSent"
   | "settings.msgSendFailed"
   | "settings.msgSmtpHint"
-  | "settings.msgUnknownAction";
+  | "settings.msgUnknownAction"
+  | "common.notFound";
 
 type Dict = Record<TKey, string>;
 
@@ -232,6 +233,7 @@ const de: Dict = {
   "products.manage": "Verwalten",
   "products.sold30": "Verkauft (30 Tage)",
   "products.catalog": "Katalog",
+  "common.notFound": "Nicht gefunden",
   "dash.firstSteps": "Erste Schritte",
   "dash.step1": "Unter Produkte mit Shopify synchronisieren.",
   "dash.step2": "Lieferart festlegen sowie Schlüssel und Dateien hochladen.",
@@ -415,6 +417,7 @@ const en: Dict = {
   "products.manage": "Manage",
   "products.sold30": "Sold (30 days)",
   "products.catalog": "Catalog",
+  "common.notFound": "Not found",
   "dash.firstSteps": "Getting started",
   "dash.step1": "Sync your catalog with Shopify under Products.",
   "dash.step2": "Set the delivery type and upload keys and files.",
@@ -598,6 +601,7 @@ const fr: Dict = {
   "products.manage": "Gérer",
   "products.sold30": "Vendu (30 jours)",
   "products.catalog": "Catalogue",
+  "common.notFound": "Introuvable",
   "dash.firstSteps": "Premiers pas",
   "dash.step1": "Synchronisez votre catalogue avec Shopify dans Produits.",
   "dash.step2": "Définissez le type de livraison et importez clés et fichiers.",
@@ -781,6 +785,7 @@ const es: Dict = {
   "products.manage": "Gestionar",
   "products.sold30": "Vendido (30 días)",
   "products.catalog": "Catálogo",
+  "common.notFound": "No encontrado",
   "dash.firstSteps": "Primeros pasos",
   "dash.step1": "Sincroniza tu catálogo con Shopify en Productos.",
   "dash.step2": "Define el tipo de entrega y sube claves y archivos.",
@@ -964,6 +969,7 @@ const it: Dict = {
   "products.manage": "Gestisci",
   "products.sold30": "Venduto (30 giorni)",
   "products.catalog": "Catalogo",
+  "common.notFound": "Non trovato",
   "dash.firstSteps": "Primi passi",
   "dash.step1": "Sincronizza il catalogo con Shopify in Prodotti.",
   "dash.step2": "Imposta il tipo di consegna e carica chiavi e file.",
@@ -1147,6 +1153,7 @@ const nl: Dict = {
   "products.manage": "Beheren",
   "products.sold30": "Verkocht (30 dagen)",
   "products.catalog": "Catalogus",
+  "common.notFound": "Niet gevonden",
   "dash.firstSteps": "Eerste stappen",
   "dash.step1": "Synchroniseer je catalogus met Shopify onder Producten.",
   "dash.step2": "Stel het leveringstype in en upload sleutels en bestanden.",
@@ -1330,6 +1337,7 @@ const pl: Dict = {
   "products.manage": "Zarządzaj",
   "products.sold30": "Sprzedano (30 dni)",
   "products.catalog": "Katalog",
+  "common.notFound": "Nie znaleziono",
   "dash.firstSteps": "Pierwsze kroki",
   "dash.step1": "Zsynchronizuj katalog z Shopify w sekcji Produkty.",
   "dash.step2": "Ustaw typ dostawy oraz prześlij klucze i pliki.",
@@ -1513,6 +1521,7 @@ const pt: Dict = {
   "products.manage": "Gerir",
   "products.sold30": "Vendido (30 dias)",
   "products.catalog": "Catálogo",
+  "common.notFound": "Não encontrado",
   "dash.firstSteps": "Primeiros passos",
   "dash.step1": "Sincronize o seu catálogo com a Shopify em Produtos.",
   "dash.step2": "Defina o tipo de entrega e carregue chaves e ficheiros.",
@@ -1696,6 +1705,7 @@ const uk: Dict = {
   "products.manage": "Керувати",
   "products.sold30": "Продано (30 днів)",
   "products.catalog": "Каталог",
+  "common.notFound": "Не знайдено",
   "dash.firstSteps": "Перші кроки",
   "dash.step1": "Синхронізуйте каталог із Shopify у розділі Товари.",
   "dash.step2": "Налаштуйте тип доставки та завантажте ключі й файли.",
@@ -1879,6 +1889,7 @@ const ar: Dict = {
   "products.manage": "إدارة",
   "products.sold30": "المباع (30 يوماً)",
   "products.catalog": "الكتالوج",
+  "common.notFound": "غير موجود",
   "dash.firstSteps": "الخطوات الأولى",
   "dash.step1": "زامن كتالوجك مع Shopify ضمن المنتجات.",
   "dash.step2": "حدّد نوع التسليم وارفع المفاتيح والملفات.",
