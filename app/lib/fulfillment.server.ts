@@ -100,6 +100,7 @@ async function processProduct(
       customerEmail: order.email,
       productId: product.id,
       status: "PENDING",
+      accessToken: generateDownloadToken(),
     },
   });
   if (delivery.status === "DELIVERED") {
