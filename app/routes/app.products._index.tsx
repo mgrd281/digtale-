@@ -3,71 +3,85 @@ import type {
   HeadersFunction,
   LoaderFunctionArgs,
 } from "react-router";
+import { useMemo, useState } from "react";
 import { useLoaderData, useFetcher, Link } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
-import { numericId, LOW_STOCK_THRESHOLD } from "../lib/shared";
+import { numericId } from "../lib/shared";
+
+function categoryOf(title: string, productType: string | null): string {
+  const t = `${title} ${productType ?? ""}`.toLowerCase();
+  if (t.includes("mac")) return "Mac";
+  if (
+    t.includes("office") ||
+    t.includes("365") ||
+    t.includes("visio") ||
+    t.includes("project") ||
+    t.includes("access")
+  )
+    return "Microsoft Office";
+  if (t.includes("windows")) return "Windows";
+  return "Sonstige";
+}
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
 
-  const products = await prisma.product.findMany({
-    orderBy: { title: "asc" },
-  });
+  const products = await prisma.product.findMany({ orderBy: { title: "asc" } });
 
-  const counts = await prisma.licenseKey.groupBy({
+  const keyCounts = await prisma.licenseKey.groupBy({
     by: ["productId", "status"],
     _count: { _all: true },
   });
-
   const fileCounts = await prisma.digitalFile.groupBy({
     by: ["productId"],
     _count: { _all: true },
   });
-
   const linkCounts = await prisma.productLink.groupBy({
     by: ["productId"],
     _count: { _all: true },
   });
 
+  const since = new Date(Date.now() - 30 * 24 * 3600_000);
+  const sales = await prisma.delivery.groupBy({
+    by: ["productId"],
+    where: { status: "DELIVERED", createdAt: { gte: since } },
+    _count: { _all: true },
+  });
+
   const rows = products.map((p) => {
     const available =
-      counts.find((c) => c.productId === p.id && c.status === "AVAILABLE")
+      keyCounts.find((c) => c.productId === p.id && c.status === "AVAILABLE")
         ?._count._all ?? 0;
-    const assigned =
-      counts.find((c) => c.productId === p.id && c.status === "ASSIGNED")
-        ?._count._all ?? 0;
-    const files =
-      fileCounts.find((c) => c.productId === p.id)?._count._all ?? 0;
-    const links =
-      linkCounts.find((c) => c.productId === p.id)?._count._all ?? 0;
+    const files = fileCounts.find((c) => c.productId === p.id)?._count._all ?? 0;
+    const links = linkCounts.find((c) => c.productId === p.id)?._count._all ?? 0;
+    const sales30 = sales.find((c) => c.productId === p.id)?._count._all ?? 0;
+    const needsKey = p.deliveryType === "KEY" || p.deliveryType === "BOTH";
+    const ready =
+      (needsKey ? available > 0 : true) &&
+      (available > 0 || files > 0 || links > 0);
     return {
       id: p.id,
       title: p.title,
       imageUrl: p.imageUrl,
-      deliveryType: p.deliveryType,
+      shopifyProductId: p.shopifyProductId,
+      category: categoryOf(p.title, p.productType),
+      needsKey,
       available,
-      assigned,
       files,
       links,
+      sales30,
+      ready,
     };
   });
 
-  // A product is "ready" once it can actually deliver something: a key in
-  // stock (for key products), a file, or a download link.
-  const ready = rows.filter((r) => {
-    const needsKey = r.deliveryType === "KEY" || r.deliveryType === "BOTH";
-    return (needsKey ? r.available > 0 : true) && (r.available > 0 || r.files > 0 || r.links > 0);
-  }).length;
-
-  return { rows, ready };
+  return { rows };
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { admin } = await authenticate.admin(request);
 
-  // Sync the first 250 products from Shopify into the local catalog.
   const response = await admin.graphql(
     `#graphql
     query SyncProducts {
@@ -76,6 +90,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           node {
             id
             title
+            productType
+            vendor
             featuredImage { url }
             featuredMedia { preview { image { url } } }
           }
@@ -95,11 +111,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       null;
     await prisma.product.upsert({
       where: { shopifyProductId: numericId(node.id) },
-      update: { title: node.title, imageUrl },
+      update: {
+        title: node.title,
+        imageUrl,
+        productType: node.productType || null,
+        vendor: node.vendor || null,
+      },
       create: {
         shopifyProductId: numericId(node.id),
         title: node.title,
         imageUrl,
+        productType: node.productType || null,
+        vendor: node.vendor || null,
       },
     });
     synced += 1;
@@ -108,121 +131,133 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   return { synced };
 };
 
-const DELIVERY_LABEL: Record<string, string> = {
-  KEY: "Schlüssel",
-  FILE: "Datei",
-  BOTH: "Schlüssel + Datei",
-};
-
 type Row = {
   id: string;
   title: string;
   imageUrl: string | null;
-  deliveryType: string;
+  shopifyProductId: string;
+  category: string;
+  needsKey: boolean;
   available: number;
-  assigned: number;
   files: number;
   links: number;
+  sales30: number;
+  ready: boolean;
 };
 
-const CARD_CSS = `
-  .kx-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-    gap: 16px;
-  }
-  .kx-card {
-    display: flex;
-    flex-direction: column;
+const CATALOG_CSS = `
+  .kx-toolbar { margin: 4px 0 8px; }
+  .kx-search {
+    width: 100%; max-width: 420px; padding: 10px 14px;
+    border: 1px solid #d8dde3; border-radius: 10px; font-size: 14px; outline: none;
     background: #fff;
-    border: 1px solid #e5e7eb;
-    border-radius: 16px;
-    overflow: hidden;
-    text-decoration: none;
-    color: inherit;
-    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
-    transition: box-shadow .18s ease, transform .18s ease, border-color .18s ease;
   }
-  .kx-card:hover {
-    box-shadow: 0 12px 28px rgba(16, 24, 40, 0.12);
-    transform: translateY(-3px);
-    border-color: #d1d5db;
+  .kx-search:focus { border-color: #1f48ff; box-shadow: 0 0 0 3px rgba(31,72,255,.12); }
+  .kx-sec-head { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 750; color: #111827; margin: 24px 0 4px; }
+  .kx-sec-count { font-size: 12px; font-weight: 700; color: #475569; background: #eef2f7; padding: 2px 9px; border-radius: 999px; }
+  .kx-cat-head { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13.5px; color: #334155; margin: 16px 0 10px; }
+  .kx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+  .kx-card {
+    display: flex; flex-direction: column; background: #fff; border: 1px solid #e5e7eb;
+    border-radius: 16px; padding: 16px; text-decoration: none; color: inherit;
+    box-shadow: 0 1px 2px rgba(16,24,40,.05); transition: box-shadow .15s ease, transform .15s ease;
   }
-  .kx-thumb {
-    aspect-ratio: 16 / 10;
-    background: linear-gradient(135deg, #f8fafc, #eef2f6);
-    display: flex; align-items: center; justify-content: center;
-    border-bottom: 1px solid #eef0f2;
+  .kx-card:hover { box-shadow: 0 10px 26px rgba(16,24,40,.10); transform: translateY(-2px); }
+  .kx-card-top { display: flex; gap: 12px; align-items: flex-start; }
+  .kx-card-img {
+    width: 52px; height: 52px; flex: 0 0 auto; border-radius: 10px; background: #f6f8fb;
+    border: 1px solid #eceff2; object-fit: contain; padding: 4px; box-sizing: border-box;
+    display: flex; align-items: center; justify-content: center; font-size: 9px; color: #b6bdc7;
   }
-  .kx-thumb img { width: 100%; height: 100%; object-fit: contain; padding: 10px; box-sizing: border-box; }
-  .kx-noimg { color: #9aa3af; font-size: 12px; letter-spacing: .02em; }
-  .kx-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 10px; }
-  .kx-title {
-    font-weight: 650; font-size: 13.5px; line-height: 1.35; color: #111827;
-    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-    overflow: hidden; min-height: 37px;
-  }
-  .kx-badges { display: flex; gap: 6px; flex-wrap: wrap; }
-  .kx-badge { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
-  .kx-meta { font-size: 12px; color: #6b7280; margin-top: 2px; }
+  .kx-card-title { font-weight: 650; font-size: 13.5px; line-height: 1.3; color: #111827;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .kx-card-id { font-size: 11px; color: #9aa3af; margin-top: 3px; }
+  .kx-card-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; gap: 8px; }
+  .kx-keys { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+  .kx-manage { background: #1f48ff; color: #fff; font-weight: 600; font-size: 12.5px; padding: 8px 14px; border-radius: 9px; white-space: nowrap; }
+  .kx-sold { font-size: 12px; color: #6b7280; margin-top: 12px; border-top: 1px solid #f1f3f5;
+    padding-top: 10px; display: flex; justify-content: space-between; }
+  .kx-sold b { color: #111827; }
+  .kx-empty { color: #6b7280; font-size: 13px; padding: 10px 0; }
 `;
 
-function ProductCard({ r }: { r: Row }) {
-  const needsKey = r.deliveryType === "KEY" || r.deliveryType === "BOTH";
-  const low = needsKey && r.available < LOW_STOCK_THRESHOLD;
-  const isReady =
-    (needsKey ? r.available > 0 : true) &&
-    (r.available > 0 || r.files > 0 || r.links > 0);
-
-  const meta: string[] = [];
-  if (needsKey) meta.push(`${r.available} Schlüssel`);
-  if (r.links > 0) meta.push(`${r.links} Links`);
-  if (r.files > 0) meta.push(`${r.files} Dateien`);
-
+function Card({ r }: { r: Row }) {
   return (
     <Link className="kx-card" to={`/app/products/${r.id}`}>
-      <div className="kx-thumb">
+      <div className="kx-card-top">
         {r.imageUrl ? (
-          <img src={r.imageUrl} alt={r.title} loading="lazy" />
+          <img className="kx-card-img" src={r.imageUrl} alt="" loading="lazy" />
         ) : (
-          <span className="kx-noimg">Kein Bild</span>
+          <span className="kx-card-img">Kein Bild</span>
         )}
+        <div style={{ minWidth: 0 }}>
+          <div className="kx-card-title">{r.title}</div>
+          <div className="kx-card-id">ID: {r.shopifyProductId}</div>
+        </div>
       </div>
-      <div className="kx-body">
-        <div className="kx-title">{r.title}</div>
-        <div className="kx-badges">
-          <span className="kx-badge" style={{ background: "#eef2ff", color: "#3538cd" }}>
-            {DELIVERY_LABEL[r.deliveryType] ?? r.deliveryType}
-          </span>
+      <div className="kx-card-foot">
+        {r.needsKey ? (
           <span
-            className="kx-badge"
+            className="kx-keys"
             style={
-              isReady
+              r.available > 0
                 ? { background: "#e7f7ec", color: "#1a7f37" }
-                : { background: "#fef3c7", color: "#92400e" }
+                : { background: "#fde8e8", color: "#b42318" }
             }
           >
-            {isReady ? "Bereit" : "Einrichten"}
+            {r.available} Keys verfügbar
           </span>
-          {low && needsKey && (
-            <span className="kx-badge" style={{ background: "#fde8e8", color: "#b42318" }}>
-              Niedriger Bestand
-            </span>
-          )}
-        </div>
-        {meta.length > 0 && <div className="kx-meta">{meta.join(" · ")}</div>}
+        ) : (
+          <span className="kx-keys" style={{ background: "#eef2ff", color: "#3538cd" }}>
+            {r.links + r.files} Downloads
+          </span>
+        )}
+        <span className="kx-manage">Verwalten →</span>
+      </div>
+      <div className="kx-sold">
+        <span>Verkauft (30 Tage)</span>
+        <b>{r.sales30}</b>
       </div>
     </Link>
   );
 }
 
+function groupByCategory(rows: Row[]): [string, Row[]][] {
+  const order = ["Windows", "Microsoft Office", "Mac", "Sonstige"];
+  const map = new Map<string, Row[]>();
+  for (const r of rows) {
+    if (!map.has(r.category)) map.set(r.category, []);
+    map.get(r.category)!.push(r);
+  }
+  return [...map.entries()].sort(
+    (a, b) => order.indexOf(a[0]) - order.indexOf(b[0]),
+  );
+}
+
 export default function Products() {
-  const { rows, ready } = useLoaderData<typeof loader>();
+  const { rows } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const syncing = fetcher.state !== "idle";
+  const [q, setQ] = useState("");
+
+  const { activeGroups, inactiveGroups, activeCount, inactiveCount } =
+    useMemo(() => {
+      const term = q.trim().toLowerCase();
+      const filtered = term
+        ? rows.filter((r) => r.title.toLowerCase().includes(term))
+        : rows;
+      const active = filtered.filter((r) => r.ready);
+      const inactive = filtered.filter((r) => !r.ready);
+      return {
+        activeGroups: groupByCategory(active),
+        inactiveGroups: groupByCategory(inactive),
+        activeCount: active.length,
+        inactiveCount: inactive.length,
+      };
+    }, [rows, q]);
 
   return (
-    <s-page heading="Produkte">
+    <s-page heading="Digitale Produkte">
       <s-button
         slot="primary-action"
         onClick={() => fetcher.submit({}, { method: "POST" })}
@@ -238,11 +273,12 @@ export default function Products() {
       )}
 
       <s-section heading="Katalog">
+        <style>{CATALOG_CSS}</style>
+
         {rows.length === 0 ? (
           <s-stack direction="block" gap="base">
             <s-paragraph>
-              Noch keine Produkte vorhanden. Synchronisieren Sie zuerst Ihren
-              Shopify-Katalog.
+              Noch keine Produkte. Synchronisieren Sie zuerst Ihren Shopify-Katalog.
             </s-paragraph>
             <s-button
               variant="primary"
@@ -253,20 +289,62 @@ export default function Products() {
             </s-button>
           </s-stack>
         ) : (
-          <s-stack direction="block" gap="base">
-            <s-stack direction="inline" gap="small">
-              <s-badge tone="info">{rows.length} Produkte</s-badge>
-              <s-badge tone={ready === rows.length ? "success" : "warning"}>
-                {ready} lieferbereit
-              </s-badge>
-            </s-stack>
-            <style>{CARD_CSS}</style>
-            <div className="kx-grid">
-              {rows.map((r) => (
-                <ProductCard key={r.id} r={r} />
-              ))}
+          <>
+            <div className="kx-toolbar">
+              <input
+                className="kx-search"
+                type="search"
+                placeholder="Suche nach Produkt …"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+              />
             </div>
-          </s-stack>
+
+            <div className="kx-sec-head">
+              ⚡ Aktive Produkte <span className="kx-sec-count">{activeCount}</span>
+            </div>
+            {activeCount === 0 ? (
+              <div className="kx-empty">
+                Keine lieferbereiten Produkte. Laden Sie Schlüssel oder Links hoch.
+              </div>
+            ) : (
+              activeGroups.map(([cat, items]) => (
+                <div key={cat}>
+                  <div className="kx-cat-head">
+                    {cat}
+                    <span className="kx-sec-count">{items.length} Produkte</span>
+                  </div>
+                  <div className="kx-grid">
+                    {items.map((r) => (
+                      <Card key={r.id} r={r} />
+                    ))}
+                  </div>
+                </div>
+              ))
+            )}
+
+            {inactiveCount > 0 && (
+              <>
+                <div className="kx-sec-head">
+                  📦 Noch nicht aktiviert{" "}
+                  <span className="kx-sec-count">{inactiveCount}</span>
+                </div>
+                {inactiveGroups.map(([cat, items]) => (
+                  <div key={cat}>
+                    <div className="kx-cat-head">
+                      {cat}
+                      <span className="kx-sec-count">{items.length} Produkte</span>
+                    </div>
+                    <div className="kx-grid">
+                      {items.map((r) => (
+                        <Card key={r.id} r={r} />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+          </>
         )}
       </s-section>
     </s-page>
