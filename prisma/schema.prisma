@@ -18,6 +18,8 @@ model StaffUser {
   id           String    @id @default(cuid())
   email        String    @unique
   passwordHash String
+  // "ADMIN" can perform every action; "VIEWER" is read-only.
+  role         String    @default("ADMIN")
   createdAt    DateTime  @default(now())
   lastLoginAt  DateTime?
 }

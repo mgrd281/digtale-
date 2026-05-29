@@ -101,6 +101,21 @@ export async function requireStaffUser(request: Request): Promise<StaffUser> {
   return user;
 }
 
+export function isAdmin(user: StaffUser): boolean {
+  return user.role === "ADMIN";
+}
+
+// Guard mutating actions: only ADMIN staff may proceed; VIEWERs get a 403.
+export async function requireStaffAdmin(request: Request): Promise<StaffUser> {
+  const user = await requireStaffUser(request);
+  if (!isAdmin(user)) {
+    throw new Response("Nur Administratoren dürfen Änderungen vornehmen.", {
+      status: 403,
+    });
+  }
+  return user;
+}
+
 export async function destroyStaffSession(request: Request): Promise<Response> {
   const session = await sessionStorage.getSession(request.headers.get("Cookie"));
   return redirect("/staff/login", {

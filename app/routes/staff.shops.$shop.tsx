@@ -1,10 +1,11 @@
-import type { LoaderFunctionArgs } from "react-router";
-import { useLoaderData, Link } from "react-router";
-import { requireStaffUser } from "../lib/staff-auth.server";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import { useLoaderData, useFetcher, Link } from "react-router";
+import { isAdmin, requireStaffAdmin, requireStaffUser } from "../lib/staff-auth.server";
+import { staffDeliveryAction } from "../lib/staff-actions.server";
 import prisma from "../db.server";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  await requireStaffUser(request);
+  const user = await requireStaffUser(request);
   const shop = decodeURIComponent(params.shop ?? "");
 
   const [settings, products, keyCounts, deliveries] = await Promise.all([
@@ -30,18 +31,20 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     }),
   ]);
 
-  const availableKeys = (productId: string) =>
-    keyCounts.find((k) => k.productId === productId && k.status === "AVAILABLE")
+  const keys = (productId: string, status: string) =>
+    keyCounts.find((k) => k.productId === productId && k.status === status)
       ?._count._all ?? 0;
 
   return {
     shop,
+    canEdit: isAdmin(user),
     shopName: settings?.shopName ?? "—",
     products: products.map((p) => ({
       id: p.id,
       title: p.title,
       deliveryType: p.deliveryType,
-      keys: availableKeys(p.id),
+      available: keys(p.id, "AVAILABLE"),
+      assigned: keys(p.id, "ASSIGNED"),
       files: p._count.files,
       links: p._count.links,
     })),
@@ -57,94 +60,153 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   };
 };
 
-const STATUS_COLOR: Record<string, [string, string]> = {
-  DELIVERED: ["#e7f7ec", "#1a7f37"],
+export const action = async ({ request }: ActionFunctionArgs) => {
+  await requireStaffAdmin(request);
+  const form = await request.formData();
+  return staffDeliveryAction(String(form.get("intent")), String(form.get("deliveryId")));
+};
+
+const STATUS: Record<string, [string, string]> = {
+  DELIVERED: ["#e7f7ec", "#176b32"],
   PENDING: ["#fef6e7", "#b54708"],
-  FAILED: ["#fde8e8", "#b42318"],
+  FAILED: ["#fdecec", "#b42318"],
 };
 
 export default function StaffShopDetail() {
-  const { shop, shopName, products, deliveries } =
+  const { shop, shopName, products, deliveries, canEdit } =
     useLoaderData<typeof loader>();
+  const fetcher = useFetcher<{ ok: boolean; message: string }>();
+
   return (
     <>
       <Link to="/staff" className="kxs-back">
         ← Zurück zur Übersicht
       </Link>
       <h1 className="kxs-h1" style={{ marginTop: 8 }}>
-        {shopName}{" "}
-        <span style={{ fontSize: 14, color: "#6b7280", fontWeight: 500 }}>
-          {shop}
-        </span>
+        {shopName}
+        <span className="sub">{shop}</span>
       </h1>
 
-      <div className="kxs-sec">Produkte ({products.length})</div>
-      {products.length === 0 ? (
-        <div className="kxs-empty">Keine Produkte.</div>
-      ) : (
-        <table className="kxs-table" style={{ marginBottom: 26 }}>
-          <thead>
-            <tr>
-              <th>Produkt</th>
-              <th>Lieferart</th>
-              <th>Schlüssel verfügbar</th>
-              <th>Dateien</th>
-              <th>Links</th>
-            </tr>
-          </thead>
-          <tbody>
-            {products.map((p) => (
-              <tr key={p.id}>
-                <td>{p.title}</td>
-                <td>{p.deliveryType}</td>
-                <td>{p.keys}</td>
-                <td>{p.files}</td>
-                <td>{p.links}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {fetcher.data?.message && (
+        <div className={"kxs-banner " + (fetcher.data.ok ? "ok" : "err")}>
+          {fetcher.data.message}
+        </div>
       )}
 
-      <div className="kxs-sec">Letzte Lieferungen ({deliveries.length})</div>
-      {deliveries.length === 0 ? (
-        <div className="kxs-empty">Keine Lieferungen.</div>
-      ) : (
-        <table className="kxs-table">
-          <thead>
-            <tr>
-              <th>Bestellung</th>
-              <th>Kunde</th>
-              <th>Produkt</th>
-              <th>Schlüssel</th>
-              <th>Status</th>
-              <th>Datum</th>
-            </tr>
-          </thead>
-          <tbody>
-            {deliveries.map((d) => {
-              const [bg, fg] = STATUS_COLOR[d.status] ?? ["#eef2f7", "#475569"];
-              return (
-                <tr key={d.id}>
-                  <td>{d.orderName}</td>
-                  <td>{d.email}</td>
-                  <td>{d.product}</td>
-                  <td style={{ fontFamily: "monospace" }}>{d.key}</td>
+      <div className="kxs-sec">Produkte ({products.length})</div>
+      <div className="kxs-panel">
+        {products.length === 0 ? (
+          <div className="kxs-empty">Keine Produkte.</div>
+        ) : (
+          <table className="kxs-table">
+            <thead>
+              <tr>
+                <th>Produkt</th>
+                <th>Lieferart</th>
+                <th>Schlüssel frei</th>
+                <th>Zugewiesen</th>
+                <th>Dateien</th>
+                <th>Links</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {products.map((p) => (
+                <tr key={p.id}>
+                  <td>{p.title}</td>
+                  <td>{p.deliveryType}</td>
+                  <td>{p.available}</td>
+                  <td>{p.assigned}</td>
+                  <td>{p.files}</td>
+                  <td>{p.links}</td>
                   <td>
-                    <span
-                      className="kxs-pill"
-                      style={{ background: bg, color: fg }}
+                    <Link
+                      className="kxs-link"
+                      to={`/staff/shops/${encodeURIComponent(shop)}/products/${p.id}`}
                     >
-                      {d.status}
-                    </span>
+                      Verwalten →
+                    </Link>
                   </td>
-                  <td>{d.createdAt}</td>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      )}
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <div className="kxs-sec">Letzte Lieferungen ({deliveries.length})</div>
+      <div className="kxs-panel">
+        {deliveries.length === 0 ? (
+          <div className="kxs-empty">Keine Lieferungen.</div>
+        ) : (
+          <table className="kxs-table">
+            <thead>
+              <tr>
+                <th>Bestellung</th>
+                <th>Kunde</th>
+                <th>Produkt</th>
+                <th>Schlüssel</th>
+                <th>Status</th>
+                <th>Datum</th>
+                {canEdit && <th>Aktionen</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {deliveries.map((d) => {
+                const [bg, fg] = STATUS[d.status] ?? ["#eef2f7", "#475569"];
+                return (
+                  <tr key={d.id}>
+                    <td>{d.orderName}</td>
+                    <td>{d.email}</td>
+                    <td>{d.product}</td>
+                    <td style={{ fontFamily: "monospace" }}>{d.key}</td>
+                    <td>
+                      <span className="kxs-pill" style={{ background: bg, color: fg }}>
+                        {d.status}
+                      </span>
+                    </td>
+                    <td style={{ whiteSpace: "nowrap" }}>{d.createdAt}</td>
+                    {canEdit && (
+                      <td>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <DeliveryButton fetcher={fetcher} id={d.id} intent="resend" label="Erneut" cls="sec" />
+                          <DeliveryButton fetcher={fetcher} id={d.id} intent="revoke" label="Widerrufen" cls="danger" />
+                          <DeliveryButton fetcher={fetcher} id={d.id} intent="delete" label="Löschen" cls="danger" />
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
     </>
+  );
+}
+
+function DeliveryButton({
+  fetcher,
+  id,
+  intent,
+  label,
+  cls,
+}: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  fetcher: any;
+  id: string;
+  intent: string;
+  label: string;
+  cls: string;
+}) {
+  return (
+    <fetcher.Form method="post">
+      <input type="hidden" name="intent" value={intent} />
+      <input type="hidden" name="deliveryId" value={id} />
+      <button type="submit" className={`kxs-btn mini ${cls}`}>
+        {label}
+      </button>
+    </fetcher.Form>
   );
 }
