@@ -1,5 +1,5 @@
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLoaderData } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
@@ -79,8 +79,24 @@ function StatCard({
 export default function Dashboard() {
   const { productCount, failedCount, pendingCount, deliveredCount, lowStock } =
     useLoaderData<typeof loader>();
+  // Dismissals persist (per count): a banner stays hidden until the number
+  // changes (e.g. a new failed delivery), then it reappears.
   const [hideFailed, setHideFailed] = useState(false);
   const [hideLowStock, setHideLowStock] = useState(false);
+  useEffect(() => {
+    setHideFailed(localStorage.getItem("kx_dismiss_failed") === String(failedCount));
+    setHideLowStock(
+      localStorage.getItem("kx_dismiss_lowstock") === String(lowStock.length),
+    );
+  }, [failedCount, lowStock.length]);
+  const dismissFailed = () => {
+    localStorage.setItem("kx_dismiss_failed", String(failedCount));
+    setHideFailed(true);
+  };
+  const dismissLowStock = () => {
+    localStorage.setItem("kx_dismiss_lowstock", String(lowStock.length));
+    setHideLowStock(true);
+  };
 
   return (
     <s-page heading="KARINEX – Digitale Auslieferung">
@@ -95,7 +111,7 @@ export default function Dashboard() {
               {failedCount} Lieferung(en) konnten nicht ausgeliefert werden.{" "}
               <s-link href="/app/deliveries?status=FAILED">Jetzt prüfen</s-link>.
             </s-paragraph>
-            <s-button variant="tertiary" onClick={() => setHideFailed(true)}>
+            <s-button variant="tertiary" onClick={dismissFailed}>
               ✕ Ausblenden
             </s-button>
           </s-stack>
@@ -111,7 +127,7 @@ export default function Dashboard() {
               {lowStock.length > 3 ? ` und ${lowStock.length - 3} weitere` : ""}.{" "}
               <s-link href="/app/products">Produkte verwalten</s-link>.
             </s-paragraph>
-            <s-button variant="tertiary" onClick={() => setHideLowStock(true)}>
+            <s-button variant="tertiary" onClick={dismissLowStock}>
               ✕ Ausblenden
             </s-button>
           </s-stack>

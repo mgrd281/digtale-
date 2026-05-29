@@ -73,6 +73,8 @@ model Product {
   shopifyProductId String       @unique
   title            String
   imageUrl         String?
+  productType      String?
+  vendor           String?
   deliveryType     DeliveryType @default(KEY)
   downloadLimit    Int          @default(3)
   linkExpiryHours  Int          @default(72)
