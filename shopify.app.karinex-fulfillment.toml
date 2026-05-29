@@ -33,6 +33,13 @@ api_version = "2025-10"
   uri = "/webhooks/orders/paid"
   topics = ["orders/paid"]
 
+  # Handled by: /app/routes/webhooks.orders.create.tsx
+  # Fires when an order is placed (before payment); delivery only happens if
+  # "deliverUnpaidOrders" is enabled in the app settings (for Vorkasse).
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/orders/create"
+  topics = ["orders/create"]
+
   # Handled by: /app/routes/webhooks.app.uninstalled.tsx
   [[webhooks.subscriptions]]
   uri = "/webhooks/app/uninstalled"

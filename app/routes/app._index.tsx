@@ -1,4 +1,5 @@
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
+import { useState } from "react";
 import { useLoaderData } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
@@ -46,21 +47,14 @@ const STAT_CSS = `
     gap: 14px;
   }
   .kx-stat {
-    position: relative;
     background: #fff;
     border: 1px solid #e5e7eb;
     border-radius: 16px;
-    padding: 18px 18px 18px 22px;
+    padding: 18px 20px;
     box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
-    overflow: hidden;
-  }
-  .kx-stat::before {
-    content: "";
-    position: absolute; left: 0; top: 0; bottom: 0; width: 5px;
-    background: var(--kx-accent);
   }
   .kx-stat-label { font-size: 13px; color: #6b7280; font-weight: 550; }
-  .kx-stat-value { font-size: 30px; font-weight: 750; color: #111827; line-height: 1.1; margin-top: 6px; }
+  .kx-stat-value { font-size: 30px; font-weight: 750; line-height: 1.1; margin-top: 8px; }
 `;
 
 function StatCard({
@@ -73,9 +67,11 @@ function StatCard({
   accent: string;
 }) {
   return (
-    <div className="kx-stat" style={{ ["--kx-accent" as string]: accent }}>
+    <div className="kx-stat">
       <div className="kx-stat-label">{label}</div>
-      <div className="kx-stat-value">{value}</div>
+      <div className="kx-stat-value" style={{ color: accent }}>
+        {value}
+      </div>
     </div>
   );
 }
@@ -83,6 +79,8 @@ function StatCard({
 export default function Dashboard() {
   const { productCount, failedCount, pendingCount, deliveredCount, lowStock } =
     useLoaderData<typeof loader>();
+  const [hideFailed, setHideFailed] = useState(false);
+  const [hideLowStock, setHideLowStock] = useState(false);
 
   return (
     <s-page heading="KARINEX – Digitale Auslieferung">
@@ -90,23 +88,33 @@ export default function Dashboard() {
         Produkte verwalten
       </s-link>
 
-      {failedCount > 0 && (
+      {failedCount > 0 && !hideFailed && (
         <s-banner tone="critical" heading="Fehlgeschlagene Lieferungen">
-          <s-paragraph>
-            {failedCount} Lieferung(en) konnten nicht ausgeliefert werden.{" "}
-            <s-link href="/app/deliveries?status=FAILED">Jetzt prüfen</s-link>.
-          </s-paragraph>
+          <s-stack direction="block" gap="small-300">
+            <s-paragraph>
+              {failedCount} Lieferung(en) konnten nicht ausgeliefert werden.{" "}
+              <s-link href="/app/deliveries?status=FAILED">Jetzt prüfen</s-link>.
+            </s-paragraph>
+            <s-button variant="tertiary" onClick={() => setHideFailed(true)}>
+              ✕ Ausblenden
+            </s-button>
+          </s-stack>
         </s-banner>
       )}
 
-      {lowStock.length > 0 && (
+      {lowStock.length > 0 && !hideLowStock && (
         <s-banner tone="warning" heading={`Niedriger Schlüsselbestand (${lowStock.length})`}>
-          <s-paragraph>
-            {lowStock.length} Produkt(e) benötigen Schlüssel, z. B.{" "}
-            {lowStock.slice(0, 3).map((p) => p.title).join(", ")}
-            {lowStock.length > 3 ? ` und ${lowStock.length - 3} weitere` : ""}.{" "}
-            <s-link href="/app/products">Produkte verwalten</s-link>.
-          </s-paragraph>
+          <s-stack direction="block" gap="small-300">
+            <s-paragraph>
+              {lowStock.length} Produkt(e) benötigen Schlüssel, z. B.{" "}
+              {lowStock.slice(0, 3).map((p) => p.title).join(", ")}
+              {lowStock.length > 3 ? ` und ${lowStock.length - 3} weitere` : ""}.{" "}
+              <s-link href="/app/products">Produkte verwalten</s-link>.
+            </s-paragraph>
+            <s-button variant="tertiary" onClick={() => setHideLowStock(true)}>
+              ✕ Ausblenden
+            </s-button>
+          </s-stack>
         </s-banner>
       )}
 
