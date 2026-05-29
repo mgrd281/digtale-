@@ -22,6 +22,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       emailIntro: s.emailIntro ?? "",
       emailFooter: s.emailFooter ?? "",
       defaultLocale: s.defaultLocale,
+      deliverUnpaidOrders: s.deliverUnpaidOrders,
     },
   };
 };
@@ -49,6 +50,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       emailIntro: String(form.get("emailIntro") ?? "").trim() || null,
       emailFooter: String(form.get("emailFooter") ?? "").trim() || null,
       defaultLocale: String(form.get("defaultLocale") ?? "de"),
+      deliverUnpaidOrders: form.get("deliverUnpaidOrders") === "true",
     });
     return data({ ok: true, message: "Einstellungen gespeichert." });
   }
@@ -140,6 +142,18 @@ export default function Settings() {
               <s-option value="de">Deutsch</s-option>
               <s-option value="en">English</s-option>
             </s-select>
+            <s-select
+              label="Sofort-Auslieferung bei Vorkasse (vor Zahlungseingang)"
+              name="deliverUnpaidOrders"
+              value={settings.deliverUnpaidOrders ? "true" : "false"}
+            >
+              <s-option value="false">Nein – erst nach Zahlungseingang</s-option>
+              <s-option value="true">Ja – sofort bei Bestellung</s-option>
+            </s-select>
+            <s-text color="subdued">
+              Bei „Ja" erhält der Kunde Schlüssel/Download schon bei
+              Bestelleingang – auch bei noch nicht bezahlter Vorkasse.
+            </s-text>
             <s-text-area
               label="Eigener Einleitungstext (optional)"
               name="emailIntro"

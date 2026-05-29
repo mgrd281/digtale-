@@ -61,6 +61,9 @@ model AppSettings {
   emailIntro    String?
   emailFooter   String?
   defaultLocale String   @default("de")
+  // Deliver immediately when an order is *created* (e.g. Vorkasse / bank
+  // transfer, before payment is confirmed) instead of only on payment.
+  deliverUnpaidOrders Boolean @default(false)
   updatedAt     DateTime @updatedAt @default(now())
 }
 
