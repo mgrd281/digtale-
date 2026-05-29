@@ -7,8 +7,9 @@ import {
 } from "@shopify/shopify-app-react-router/server";
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./db.server";
+import { PLANS } from "./lib/billing.server";
 
-// Subscription plan name. Referenced by the admin layout's billing gate.
+// Backwards-compatible export (the original single plan name).
 export const PRO_PLAN = "Pro";
 
 const shopify = shopifyApp({
@@ -20,18 +21,22 @@ const shopify = shopifyApp({
   authPathPrefix: "/auth",
   sessionStorage: new PrismaSessionStorage(prisma),
   distribution: AppDistribution.AppStore,
-  billing: {
-    [PRO_PLAN]: {
-      lineItems: [
-        {
-          amount: 9.99,
-          currencyCode: "USD",
-          interval: BillingInterval.Every30Days,
-        },
-      ],
-      trialDays: 14,
-    },
-  },
+  // Three subscription tiers, built from the shared PLANS definition.
+  billing: Object.fromEntries(
+    PLANS.map((p) => [
+      p.id,
+      {
+        lineItems: [
+          {
+            amount: p.price,
+            currencyCode: p.currency,
+            interval: BillingInterval.Every30Days,
+          },
+        ],
+        trialDays: p.trialDays,
+      },
+    ]),
+  ),
   future: {
     expiringOfflineAccessTokens: true,
   },

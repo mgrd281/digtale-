@@ -11,7 +11,26 @@
 
 export const BILLING_ENABLED = process.env.BILLING_ENABLED === "true";
 
-// The Pro plan price (kept in sync with the billing config in shopify.server).
+// Subscription tiers. The plan `id` is the name stored in Shopify Billing and
+// referenced by billing.require / billing.request. All tiers unlock the app;
+// higher tiers are positioned for larger catalogs + priority support.
+export interface Plan {
+  id: string;
+  price: number;
+  currency: string;
+  trialDays: number;
+  popular?: boolean;
+}
+
+export const PLANS: Plan[] = [
+  { id: "Starter", price: 9.99, currency: "USD", trialDays: 14 },
+  { id: "Pro", price: 19.99, currency: "USD", trialDays: 14, popular: true },
+  { id: "Business", price: 39.99, currency: "USD", trialDays: 14 },
+];
+
+export const PLAN_IDS = PLANS.map((p) => p.id);
+
+// Representative price for a manually-set "PAID" shop in MRR estimates.
 export const PRO_PLAN_PRICE = 9.99;
 export const PRO_PLAN_CURRENCY = "USD";
 

@@ -19,6 +19,7 @@ export type TKey =
   | "nav.products"
   | "nav.orders"
   | "nav.settings"
+  | "nav.abo"
   | "welcome.title"
   | "welcome.subtitle"
   | "welcome.f1"
@@ -211,6 +212,7 @@ const de: Dict = {
   "nav.products": "Produkte",
   "nav.orders": "Bestellungen",
   "nav.settings": "Einstellungen",
+  "nav.abo": "Abo",
   "welcome.title": "Willkommen bei KARINEX",
   "welcome.subtitle": "Mit KARINEX ist der Verkauf digitaler Produkte einfach.",
   "welcome.f1": "Schlüssel & Download-Links sofort nach dem Kauf senden",
@@ -395,6 +397,7 @@ const en: Dict = {
   "nav.products": "Products",
   "nav.orders": "Orders",
   "nav.settings": "Settings",
+  "nav.abo": "Subscription",
   "welcome.title": "Welcome to KARINEX",
   "welcome.subtitle": "With KARINEX, selling digital products is easy.",
   "welcome.f1": "Send keys & download links instantly after checkout",
@@ -579,6 +582,7 @@ const fr: Dict = {
   "nav.products": "Produits",
   "nav.orders": "Commandes",
   "nav.settings": "Paramètres",
+  "nav.abo": "Abonnement",
   "welcome.title": "Bienvenue chez KARINEX",
   "welcome.subtitle": "Avec KARINEX, vendre des produits numériques est simple.",
   "welcome.f1": "Envoyez clés et liens de téléchargement dès l'achat",
@@ -763,6 +767,7 @@ const es: Dict = {
   "nav.products": "Productos",
   "nav.orders": "Pedidos",
   "nav.settings": "Ajustes",
+  "nav.abo": "Suscripción",
   "welcome.title": "Bienvenido a KARINEX",
   "welcome.subtitle": "Con KARINEX, vender productos digitales es fácil.",
   "welcome.f1": "Envía claves y enlaces de descarga al instante tras la compra",
@@ -947,6 +952,7 @@ const it: Dict = {
   "nav.products": "Prodotti",
   "nav.orders": "Ordini",
   "nav.settings": "Impostazioni",
+  "nav.abo": "Abbonamento",
   "welcome.title": "Benvenuto in KARINEX",
   "welcome.subtitle": "Con KARINEX vendere prodotti digitali è semplice.",
   "welcome.f1": "Invia chiavi e link di download subito dopo l'acquisto",
@@ -1131,6 +1137,7 @@ const nl: Dict = {
   "nav.products": "Producten",
   "nav.orders": "Bestellingen",
   "nav.settings": "Instellingen",
+  "nav.abo": "Abonnement",
   "welcome.title": "Welkom bij KARINEX",
   "welcome.subtitle": "Met KARINEX is digitale producten verkopen eenvoudig.",
   "welcome.f1": "Verstuur sleutels en downloadlinks direct na aankoop",
@@ -1315,6 +1322,7 @@ const pl: Dict = {
   "nav.products": "Produkty",
   "nav.orders": "Zamówienia",
   "nav.settings": "Ustawienia",
+  "nav.abo": "Subskrypcja",
   "welcome.title": "Witamy w KARINEX",
   "welcome.subtitle": "Z KARINEX sprzedaż produktów cyfrowych jest prosta.",
   "welcome.f1": "Wysyłaj klucze i linki do pobrania od razu po zakupie",
@@ -1499,6 +1507,7 @@ const pt: Dict = {
   "nav.products": "Produtos",
   "nav.orders": "Pedidos",
   "nav.settings": "Configurações",
+  "nav.abo": "Assinatura",
   "welcome.title": "Bem-vindo à KARINEX",
   "welcome.subtitle": "Com a KARINEX, vender produtos digitais é fácil.",
   "welcome.f1": "Envie chaves e links de download logo após a compra",
@@ -1683,6 +1692,7 @@ const uk: Dict = {
   "nav.products": "Товари",
   "nav.orders": "Замовлення",
   "nav.settings": "Налаштування",
+  "nav.abo": "Підписка",
   "welcome.title": "Ласкаво просимо до KARINEX",
   "welcome.subtitle": "З KARINEX продавати цифрові товари легко.",
   "welcome.f1": "Надсилайте ключі та посилання на завантаження одразу після покупки",
@@ -1867,6 +1877,7 @@ const ar: Dict = {
   "nav.products": "المنتجات",
   "nav.orders": "الطلبات",
   "nav.settings": "الإعدادات",
+  "nav.abo": "الاشتراك",
   "welcome.title": "مرحباً بك في KARINEX",
   "welcome.subtitle": "مع KARINEX، بيع المنتجات الرقمية سهل.",
   "welcome.f1": "أرسل المفاتيح وروابط التحميل فوراً بعد الشراء",
