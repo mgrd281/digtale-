@@ -10,6 +10,18 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// --- Staff portal (karinex.de control panel) ---
+// Internal staff accounts for the cross-shop admin at /staff. Separate from
+// Shopify sessions: the portal lives outside the embedded admin and uses its
+// own cookie-based auth.
+model StaffUser {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  createdAt    DateTime  @default(now())
+  lastLoginAt  DateTime?
+}
+
 // --- Shopify session storage (required by the app template) ---
 model Session {
   id            String    @id
