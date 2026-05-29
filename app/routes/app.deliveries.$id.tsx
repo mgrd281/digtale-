@@ -6,7 +6,7 @@ import prisma from "../db.server";
 import { env } from "../lib/env.server";
 import { generateDownloadToken } from "../lib/tokens.server";
 import { getSettings } from "../lib/settings.server";
-import { t } from "../lib/i18n";
+import { t, statusLabel } from "../lib/i18n";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
@@ -89,7 +89,7 @@ export default function DeliveryCustomerView() {
                   : "warning"
             }
           >
-            {d.status}
+            {statusLabel(d.locale, d.status)}
           </s-badge>
         </s-stack>
       </s-section>

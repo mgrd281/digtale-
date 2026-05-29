@@ -9,7 +9,7 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { resendDelivery, revokeDelivery } from "../lib/deliveries.server";
 import { getSettings } from "../lib/settings.server";
-import { t } from "../lib/i18n";
+import { t, statusLabel } from "../lib/i18n";
 import type { DeliveryStatus, Prisma } from "@prisma/client";
 
 const STATUSES: DeliveryStatus[] = ["PENDING", "DELIVERED", "FAILED"];
@@ -103,7 +103,7 @@ export default function Deliveries() {
   const action = useFetcher<{ ok: boolean; message: string }>();
 
   return (
-    <s-page heading={t(locale, "deliveries.title")}>
+    <s-page heading={t(locale, "nav.orders")}>
       {action.data?.message && (
         <s-banner tone={action.data.ok ? "success" : "critical"}>
           <s-paragraph>{action.data.message}</s-paragraph>
@@ -154,7 +154,7 @@ export default function Deliveries() {
                     <s-text>{d.key ?? t(locale, "detail.dash")}</s-text>
                   </s-table-cell>
                   <s-table-cell>
-                    <s-badge tone={statusTone(d.status)}>{d.status}</s-badge>
+                    <s-badge tone={statusTone(d.status)}>{statusLabel(locale, d.status)}</s-badge>
                   </s-table-cell>
                   <s-table-cell>{d.createdAt}</s-table-cell>
                   <s-table-cell>
