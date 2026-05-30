@@ -1,0 +1,69 @@
+/* =========================================================
+   KARINEX / Keyflow — Brand & Design Tokens
+   انسخ هذا الملف واستخدم المتغيّرات في أي صفحة:  color: var(--kx-green);
+   ========================================================= */
+:root {
+  /* ---- العلامة (Brand) ---- */
+  --kx-green:        #0b3d2e;  /* اللون الرئيسي */
+  --kx-green-dark:   #08291f;
+  --kx-green-darker: #0a3527;
+  --kx-green-mid:    #14573f;
+  --kx-green-mid2:   #10503b;
+  --kx-green-light:  #13624a;
+  --kx-accent:       #1bbf73;  /* زر الإجراء البارز (CTA) */
+  --kx-accent-hover: #15a763;
+  --kx-success:      #1a7f37;
+  --kx-success-2:    #176b32;
+
+  /* ---- ألوان مساعدة ---- */
+  --kx-blue:   #1f48ff;  /* روابط / أزرار ثانوية */
+  --kx-indigo: #3538cd;
+
+  /* ---- الأسطح والخلفيات ---- */
+  --kx-white:    #ffffff;
+  --kx-bg:       #f1f5f4;
+  --kx-bg-2:     #f4f6f8;
+  --kx-bg-3:     #fafbfc;
+  --kx-border:   #e5e7eb;
+  --kx-border-2: #e3e8e6;
+
+  /* ---- النصوص ---- */
+  --kx-ink:     #111827;  /* أساسي */
+  --kx-ink-2:   #0f172a;
+  --kx-muted:   #64748b;  /* باهت */
+  --kx-muted-2: #6b7280;
+
+  /* ---- ألوان الحالات (Badges) ---- */
+  --kx-success-bg: #e7f7ec;  --kx-success-fg: #176b32;
+  --kx-warning-bg: #fef6e7;  --kx-warning-fg: #b54708;
+  --kx-danger-bg:  #fde8e8;  --kx-danger-fg:  #b42318;
+
+  /* ---- رموز التصميم (Design tokens) ---- */
+  --kx-radius-sm: 10px;
+  --kx-radius:    16px;
+  --kx-radius-lg: 22px;
+  --kx-shadow:    0 1px 2px rgba(16, 24, 40, .05);
+  --kx-shadow-lg: 0 16px 40px rgba(11, 61, 46, .10);
+  --kx-font: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --kx-gradient: linear-gradient(150deg, #13624a, #0a3527);
+}
+
+/* ---- أمثلة جاهزة ---- */
+.kx-btn {
+  background: var(--kx-green); color: #fff; border: 0;
+  border-radius: var(--kx-radius-sm); padding: 12px 22px;
+  font-weight: 700; font-family: var(--kx-font); cursor: pointer;
+}
+.kx-btn:hover { background: var(--kx-green-mid); }
+
+.kx-btn-cta { background: var(--kx-accent); color: #04231a; }
+.kx-btn-cta:hover { background: var(--kx-accent-hover); }
+
+.kx-card {
+  background: #fff; border: 1px solid var(--kx-border);
+  border-radius: var(--kx-radius); box-shadow: var(--kx-shadow); padding: 18px;
+}
+
+.kx-badge-success { background: var(--kx-success-bg); color: var(--kx-success-fg); }
+.kx-badge-warning { background: var(--kx-warning-bg); color: var(--kx-warning-fg); }
+.kx-badge-danger  { background: var(--kx-danger-bg);  color: var(--kx-danger-fg); }
